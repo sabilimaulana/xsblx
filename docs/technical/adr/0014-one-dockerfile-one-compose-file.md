@@ -42,7 +42,10 @@ One `Dockerfile` with `server` and `web` targets, and one `compose.yaml` whose
 
 The server's runtime dependencies are installed in a stage that first deletes
 `bun.lock`, the `apps/web` and `packages/ui` manifests, and the server's
-`devDependencies`, then installs with `--linker hoisted`. 575MB → 195MB.
+`devDependencies`, then installs with `--linker hoisted`. It then prunes what
+only a type-checker or a debugger reads — `*.d.ts`, `*.d.mts`, `*.d.cts`, `*.map`
+and the `src/` trees packages ship beside `dist/` — which is two thirds of the
+remaining tree. 575MB → 129MB.
 
 Migrations run as a one-shot `migrate` service that the server waits on with
 `service_completed_successfully`, executing `apps/server/src/migrate.ts` —
@@ -54,6 +57,20 @@ drizzle-orm's own migrator, so the image needs no drizzle-kit.
   Every direct server dependency is pinned exactly, so the risk is bounded, and
   the image is a third of the size. Reverting is a one-line change if a
   transitive ever breaks a deploy.
+- The prune is safe only while nothing resolves a runtime entry to a raw `.ts`.
+  The packages that list one (`better-auth`, `zod`, `@standard-schema/spec`) put
+  it behind a `dev-source`-style condition bun never enables, and `@xsblx/api`,
+  which does need its sources, is a symlink out of `node_modules` that `find`
+  does not follow. A dependency that ships TypeScript as its default entry would
+  break at import time, not at build time.
+- Every size here is uncompressed, as `docker images` reports it. The registry
+  stores layers gzipped, so a pull moves roughly half that — Docker Hub lists the
+  bun base at 41MB against the 101MB it occupies once extracted.
+- 87MB of the remaining 129MB is the bun binary in the base image, so that is the
+  floor for anything running `bun`. Bundling the server with `bun build` to drop
+  `node_modules` entirely reaches 104MB but breaks Better Auth — its route table
+  does not survive static bundling, and every `/api/auth/*` request 404s. Not
+  worth 25MB.
 - The web image is the `.output` directory and nothing else (ADR 0013), 104MB.
 - `VITE_API_URL` is compiled into the client bundle, so it is a build argument
   on the `web` service, not a runtime variable. Changing the API origin means

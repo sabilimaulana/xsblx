@@ -11,6 +11,10 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **The server image is 129MB, down from 195MB.** The runtime install now prunes
+  declarations, sourcemaps and the `src/` trees packages ship beside `dist/`,
+  which nothing reads at runtime — `node_modules` drops from 94MB to 28MB. The
+  remaining 87MB is the bun binary itself (ADR 0014).
 - **Validation failures read as human messages.** The credential and todo-title
   schemas carry `message` annotations on their checks, so the sign-in/sign-up
   and add-todo forms show "Enter a valid email address" or "Title is required"
@@ -19,7 +23,7 @@ in an ADR, not here — link it.
 
 ### Added
 
-- **Containers.** A root `Dockerfile` with `server` (195MB) and `web` (104MB)
+- **Containers.** A root `Dockerfile` with `server` (129MB) and `web` (104MB)
   targets on `oven/bun:1.3.14-alpine`, and a `compose.yaml` running Postgres 18
   plus both apps. `docker compose up -d` brings up Postgres alone for the host
   dev loop; `docker compose --profile app up -d --build` runs the whole stack

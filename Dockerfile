@@ -25,10 +25,20 @@ RUN bun install --frozen-lockfile --ignore-scripts
 # price of a runtime image a third of the size.
 # `--linker hoisted`: the isolated default extracts every package into a shared
 # store next to the symlinks, and the store is what makes the layer big.
+# The prune drops what only a type-checker or a debugger reads: declarations,
+# sourcemaps and the `src/` trees packages ship beside `dist/`. It is two thirds
+# of the tree. Nothing here resolves a runtime entry to a raw `.ts` — the ones
+# that list one (better-auth, zod) put it behind a `dev-source` condition bun
+# never enables, and `@xsblx/api`, which does need its sources, is a symlink out
+# of `node_modules` to `/app/packages/api`, which `find` does not follow.
 FROM manifests AS prod-deps
 RUN rm -rf bun.lock apps/web packages/ui \
   && bun -e 'const f="apps/server/package.json",p=require("./"+f);delete p.devDependencies;require("fs").writeFileSync(f,JSON.stringify(p))' \
-  && bun install --ignore-scripts --production --linker hoisted
+  && bun install --ignore-scripts --production --linker hoisted \
+  && find node_modules -type f \
+       \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
+  && find node_modules -mindepth 2 -maxdepth 3 -type d -name src -exec rm -rf {} + \
+  && find node_modules -type f \( -name '*.md' -o -name 'LICENSE*' \) -delete
 
 
 FROM base AS server
