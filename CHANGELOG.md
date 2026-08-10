@@ -15,7 +15,8 @@ in an ADR, not here — link it.
   targets on `oven/bun:1.3.14-alpine`, and a `compose.yaml` running Postgres 18
   plus both apps. `docker compose up -d` brings up Postgres alone for the host
   dev loop; `docker compose --profile app up -d --build` runs the whole stack
-  (ADR 0014). Root `.env.example` documents the compose variables.
+  (ADR 0014). Root `.env.example` documents the compose variables. `bun run
+  start:docker` is a shorthand for that second command.
 - **`apps/server/src/migrate.ts`** applies `drizzle/` with drizzle-orm's
   migrator, so the runtime image carries no drizzle-kit. Compose runs it as a
   one-shot service the server waits on.

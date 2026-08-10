@@ -35,6 +35,7 @@
     "start": "bun run --filter '*' start",
     "start:web": "bun run --filter web start",
     "start:server": "bun run --filter server start",
+    "start:docker": "docker compose --profile app up -d --build",
     "db:generate": "bun run --filter server db:generate",
     "db:migrate": "bun run --filter server db:migrate",
     "db:push": "bun run --filter server db:push",
