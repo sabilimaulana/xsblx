@@ -11,9 +11,14 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **Nitro build for `apps/web`** (`nitro` 3.0.260610-beta, `nitro/vite` plugin).
+  `bun run build` now emits `.output/`, and `bun run start` serves
+  `.output/server/index.mjs` — which serves `/assets/*` too, so the production
+  build no longer 404s every stylesheet and JS chunk (ADR 0013).
+- **Root not-found component.** `__root.tsx` sets `notFoundComponent`, replacing
+  TanStack Router's `<p>Not Found</p>` default and its startup warning.
 - **Root `bun run start`** runs the production build of both apps
-  (`start:web`, `start:server`); `apps/web` gained a `start` that serves
-  `dist/server/server.js` from `bun run build`.
+  (`start:web`, `start:server`); `apps/web` gained a `start`.
 - **`apps/web/.env`** (from `.env.example`): `PORT` — default 3001, honoured by
   `dev`, `preview` and the production `start` — and `VITE_API_URL`. No port is
   hardcoded in a script any more.
@@ -32,7 +37,7 @@ in an ADR, not here — link it.
   rules live for someone arriving at the repo cold.
 - **Documentation split.** `AGENTS.md` now carries only rules an agent can
   violate; `docs/technical/architecture.md` describes the system and its known
-  ceilings, and `docs/technical/adr/` records the twelve decisions behind it.
+  ceilings, and `docs/technical/adr/` records the thirteen decisions behind it.
   Precedence and versioning conventions are in `docs/README.md`.
 - **Email + password auth** (Better Auth 1.7.0-rc.4): `/signin`, `/signup`, a
   session cookie, and `TodosApiGroup` closed behind `Authentication` middleware.

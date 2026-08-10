@@ -99,6 +99,9 @@ another library for anything Effect already provides.
   `Schema.DateTimeUtc` on anything the web reads.
 - **Every query-backed route sets `ssr: false`** — the session cookie is
   browser-only, so an SSR pass gets a 401.
+- **The production build goes through Nitro** (ADR 0013): `bun run build` emits
+  `.output/`, `bun run start` runs `.output/server/index.mjs`. Only that server
+  serves `/assets/*` — checking a build means checking a stylesheet returns 200.
 - **Do not install `@effect-atom/atom-react`** for request/response. It is for
   push state a query cannot model (a live `Stream`), and nothing here needs that.
 - **Effect `Schema` is the only validator** (ADR 0009). Forms validate against the
