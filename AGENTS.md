@@ -121,6 +121,21 @@ error, no warning. If that symptom appears:
 `ls node_modules/.bun | grep '^vite@'`. This is why
 `apps/server/vitest.config.ts` uses `process.loadEnvFile`, not vite's `loadEnv`.
 
+## Containers
+
+**One `Dockerfile` (targets `server`, `web`) and one `compose.yaml`** (ADR 0014).
+A second Dockerfile or a `compose.prod.yml` is a wrong turn — a new service goes
+in a profile.
+
+- **Bun is pinned to `1.3.14` in the image and in CI.** Bump both together.
+- **The server's runtime install deletes `bun.lock`, the web/ui manifests and the
+  devDependencies, and uses `--linker hoisted`.** Every part of that is
+  load-bearing; read ADR 0014 before simplifying it back to `bun install`.
+- **Migrations run through `apps/server/src/migrate.ts`**, never `drizzle-kit` —
+  the image has no dev dependencies.
+- **Adding a server dependency at an inexact version is not safe here**, because
+  the image resolves without the lockfile. Pin it.
+
 ## UI components
 
 **Check the shadcn registry before hand-writing any primitive** (ADR 0011):

@@ -64,6 +64,21 @@ bun run start:web
 bun run start:server
 ```
 
+## Docker
+
+One `Dockerfile` (targets `server` and `web`) and one `compose.yaml`, split by
+profile (ADR 0014). Copy `.env.example` to `.env` first and set `AUTH_SECRET`.
+
+```sh
+docker compose up -d                        # Postgres only — `bun dev` on the host
+docker compose --profile app up -d --build  # the whole stack: db, server, web
+docker compose --profile app down -v        # and throw the data away
+```
+
+The `app` profile runs migrations as a one-shot `migrate` service before the
+server starts. `VITE_API_URL` is compiled into the client bundle, so changing
+the API origin means rebuilding the `web` image, not restarting it.
+
 Ports come from `PORT` in each app's `.env` (`apps/web` 3001, `apps/server` 3000) and apply to `dev` and `start` alike — change the env, not a script. The
 database commands are `bun run db:generate | db:migrate | db:push | db:pull |
 db:check | db:up | db:studio`.

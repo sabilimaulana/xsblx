@@ -1,0 +1,70 @@
+# One file for both uses, split by profile:
+#   docker compose up -d                        # postgres only — `bun dev` on the host
+#   docker compose --profile app up -d --build  # the whole stack in containers
+# Compose reads the root `.env` for the interpolations below; see `.env.example`.
+
+name: xsblx
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-xsblx}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # postgres 18 wants the whole directory, not `data/` — it stores each
+      # major version in its own subdirectory so `pg_upgrade` can work.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Runs to completion before the server starts, so a deploy never serves
+  # traffic against an unmigrated schema.
+  migrate:
+    profiles: [app]
+    build: { context: ., target: server }
+    command: ["bun", "apps/server/src/migrate.ts"]
+    environment:
+      DATABASE_URL: &database-url postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-xsblx}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  server:
+    profiles: [app]
+    build: { context: ., target: server }
+    environment:
+      PORT: 3000
+      DATABASE_URL: *database-url
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001}
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    profiles: [app]
+    build:
+      context: .
+      target: web
+      # The API origin is compiled into the client bundle, so it is a build
+      # argument, not a runtime variable.
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    environment:
+      PORT: 3001
+    ports:
+      - "${WEB_PORT:-3001}:3001"
+    depends_on:
+      - server
+
+volumes:
+  postgres-data:
