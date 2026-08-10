@@ -1,0 +1,46 @@
+{
+  "name": "asshls",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "@types/node": "^22.10.2",
+      "@types/react": "^19.2.0",
+      "@types/react-dom": "^19.2.0",
+      "lucide-react": "^1.30.0",
+      "react": "^19.2.0",
+      "react-dom": "^19.2.0",
+      "tailwindcss": "^4.1.18",
+      "typescript": "^7.0.2",
+      "vite": "^8.0.0"
+    },
+    "catalogs": {
+      "effect": {
+        "@effect/platform-bun": "4.0.0-beta.103",
+        "@effect/sql-pg": "4.0.0-beta.103",
+        "@effect/vitest": "4.0.0-beta.103",
+        "effect": "4.0.0-beta.103"
+      }
+    }
+  },
+  "scripts": {
+    "prepare": "lefthook install",
+    "dev": "bun run --filter '*' dev",
+    "dev:web": "bun run --filter web dev",
+    "dev:server": "bun run --filter server dev",
+    "build": "bun run --filter web build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "oxlint --disable-nested-config",
+    "format": "oxfmt --disable-nested-config",
+    "format:check": "oxfmt --check --disable-nested-config"
+  },
+  "devDependencies": {
+    "lefthook": "^2.1.10",
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.77.0",
+    "typescript": "catalog:"
+  }
+}

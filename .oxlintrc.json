@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "plugins": ["typescript", "unicorn", "react", "jsx-a11y", "import"],
+  "ignorePatterns": ["repos/**", "apps/web/src/routeTree.gen.ts"],
+  "rules": {
+    // React 19 automatic JSX runtime — no React import needed.
+    "react/react-in-jsx-scope": "off",
+    // Effect.gen bodies are generators that legitimately never yield.
+    "require-yield": "off",
+    // `_tag` is Effect's discriminant for tagged errors and unions.
+    "no-underscore-dangle": "off"
+  },
+  "overrides": [
+    {
+      // shadcn primitives are generated upstream code. They compose accessibility
+      // through Base UI rather than the markup patterns these rules look for, and
+      // editing them would be overwritten by the next `shadcn add`.
+      "files": ["packages/ui/src/components/*.tsx"],
+      "rules": {
+        "jsx-a11y/label-has-associated-control": "off",
+        "jsx-a11y/prefer-tag-over-role": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@asshls/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./domain/*": "./src/domain/*.ts",
+    "./groups/*": "./src/groups/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:effect"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["repos/**", "apps/web/src/routeTree.gen.ts"]
+}
