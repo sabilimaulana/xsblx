@@ -11,6 +11,18 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **The TanStack devtools no longer ship in the production web bundle.** They
+  render behind `import.meta.env.DEV` and moved to `devDependencies`, along with
+  the other build-time-only packages in `apps/web` (`nitro`, `tailwindcss`,
+  `@tailwindcss/vite`).
+- **`@xsblx/ui` declares `react` as a peer dependency** rather than a direct one,
+  and no longer depends on `react-dom`, which it never imported. `shadcn` moved
+  to `devDependencies` — it is a CLI and a build-time CSS import.
+- **`cn` comes from `cnfast`**, replacing `clsx` + `tailwind-merge`.
+  `packages/ui/src/lib/utils.ts` no longer composes the two — it re-exports
+  `cnfast`'s `cn`, so `@xsblx/ui/lib/utils` stays the import path for components
+  and for the `utils` alias in both `components.json` files.
+
 - **The server image is 129MB, down from 195MB.** The runtime install now prunes
   declarations, sourcemaps and the `src/` trees packages ship beside `dist/`,
   which nothing reads at runtime — `node_modules` drops from 94MB to 28MB. The
@@ -28,7 +40,7 @@ in an ADR, not here — link it.
   plus both apps. `docker compose up -d` brings up Postgres alone for the host
   dev loop; `docker compose --profile app up -d --build` runs the whole stack
   (ADR 0014). Root `.env.example` documents the compose variables. `bun run
-  start:docker` is a shorthand for that second command.
+start:docker` is a shorthand for that second command.
 - **`apps/server/src/migrate.ts`** applies `drizzle/` with drizzle-orm's
   migrator, so the runtime image carries no drizzle-kit. Compose runs it as a
   one-shot service the server waits on.

@@ -37,7 +37,9 @@ because Bun loads the `.env` in the cwd. There is no repo-root `.env`.
 ## Import paths
 
 - Workspace packages are `@xsblx/*`. UI imports as `@xsblx/ui/components/<name>`,
-  `@xsblx/ui/lib/utils`, `@xsblx/ui/globals.css`.
+  `@xsblx/ui/lib/utils`, `@xsblx/ui/globals.css`. `lib/utils` re-exports `cn` from
+  `cnfast`, which replaces the usual `clsx` + `tailwind-merge` pair — the path
+  stays because shadcn generates imports against it.
 - `packages/api` exports one subpath per feature file — `@xsblx/api/<feature>/<file>`
   via `"./*": "./src/features/*.ts"` — plus `@xsblx/api/api` for the root.
 - Inside `apps/web`, `@/*` maps to `apps/web/src/*`. It is the only in-app alias.
@@ -49,7 +51,7 @@ the layer is the filename (ADR 0005).
 
 | Layer          | File                                             | Responsibility                                                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Domain         | `packages/api/src/features/todos/schema.ts`        | `Schema.Class` + branded id. No IO, no framework types.                                     |
+| Domain         | `packages/api/src/features/todos/schema.ts`      | `Schema.Class` + branded id. No IO, no framework types.                                     |
 | Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
 | API definition | `packages/api/src/features/todos/group.ts`       | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
 | API root       | `packages/api/src/api.ts`                        | Composes every group into `Api`.                                                            |
