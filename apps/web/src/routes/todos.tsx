@@ -11,6 +11,9 @@ import { runApi } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/todos")({
+  // The session cookie lives in the browser, so the loader has to run there: an
+  // SSR pass would call the API without credentials and get a 401.
+  ssr: false,
   // Loader results are serialized to the browser, and the serializer only handles
   // plain values — a `Schema.Class` instance throws. Spread domain objects into
   // plain ones at this boundary; `Date` fields survive, `DateTime.Utc` would not.

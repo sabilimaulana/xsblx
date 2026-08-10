@@ -5,13 +5,16 @@ import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { CorsConfig, ServerConfig } from "./config.ts";
 import { AuthRoutes } from "./http/auth.ts";
+import { AuthenticationLive } from "./http/authentication.ts";
 import { HealthHandlers } from "./http/health.ts";
 import { TodosApiHandlers } from "./http/todos.ts";
 
 const ApiRoutes = Layer.mergeAll(
   HttpApiBuilder.layer(Api, {
     openapiPath: "/openapi.json",
-  }).pipe(Layer.provide([HealthHandlers, TodosApiHandlers])),
+  }).pipe(
+    Layer.provide([HealthHandlers, TodosApiHandlers.pipe(Layer.provide(AuthenticationLive))]),
+  ),
   AuthRoutes,
 );
 

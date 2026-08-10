@@ -1,40 +1,80 @@
 import { assert, layer } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
+import { Drizzle, DrizzleLive } from "../src/db/index.ts";
+import { user } from "../src/db/schema.ts";
 import { Todos } from "../src/todos.ts";
+
+const OWNER = "test-user-owner";
+const OTHER = "test-user-other";
+
+/** Todos are owned, so the owners have to exist before anything can be created. */
+const seedUsers = Effect.gen(function* () {
+  const db = yield* Drizzle;
+  yield* db
+    .insert(user)
+    .values([OWNER, OTHER].map((id) => ({ id, name: id, email: `${id}@example.test` })))
+    .onConflictDoNothing()
+    .pipe(Effect.orDie);
+});
 
 /**
  * Integration test: runs against the real Postgres from DATABASE_URL, because
  * the interesting part of `Todos` is the SQL, and a hand-rolled in-memory fake
  * would only test itself.
  */
-layer(Todos.layer)("Todos", (it) => {
+layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
   it.effect("creates, reads, updates and removes", () =>
     Effect.gen(function* () {
+      yield* seedUsers;
       const todos = yield* Todos;
 
-      const created = yield* todos.create({ title: "write the example slice" });
+      const created = yield* todos.create(OWNER, { title: "write the example slice" });
       assert.strictEqual(created.completed, false);
 
-      const fetched = yield* todos.getById(created.id);
+      const fetched = yield* todos.getById(OWNER, created.id);
       assert.strictEqual(fetched.title, "write the example slice");
 
-      const completed = yield* todos.update(created.id, { completed: true });
+      const completed = yield* todos.update(OWNER, created.id, { completed: true });
       assert.strictEqual(completed.completed, true);
 
-      const listed = yield* todos.list();
+      const listed = yield* todos.list(OWNER);
       assert.isTrue(listed.some((todo) => todo.id === created.id));
 
-      yield* todos.remove(created.id);
+      yield* todos.remove(OWNER, created.id);
 
-      const afterRemoval = yield* todos.getById(created.id).pipe(Effect.flip);
+      const afterRemoval = yield* todos.getById(OWNER, created.id).pipe(Effect.flip);
       assert.strictEqual(afterRemoval.reason._tag, "TodoNotFound");
+    }),
+  );
+
+  it.effect("hides another user's todo behind TodoNotFound", () =>
+    Effect.gen(function* () {
+      yield* seedUsers;
+      const todos = yield* Todos;
+
+      const created = yield* todos.create(OWNER, { title: "not yours" });
+
+      const read = yield* todos.getById(OTHER, created.id).pipe(Effect.flip);
+      assert.strictEqual(read.reason._tag, "TodoNotFound");
+
+      const written = yield* todos
+        .update(OTHER, created.id, { title: "hijacked" })
+        .pipe(Effect.flip);
+      assert.strictEqual(written.reason._tag, "TodoNotFound");
+
+      const deleted = yield* todos.remove(OTHER, created.id).pipe(Effect.flip);
+      assert.strictEqual(deleted.reason._tag, "TodoNotFound");
+
+      assert.isEmpty(yield* todos.list(OTHER));
+
+      yield* todos.remove(OWNER, created.id);
     }),
   );
 
   it.effect("fails with TodoNotFound for an unknown id", () =>
     Effect.gen(function* () {
       const todos = yield* Todos;
-      const error = yield* todos.getById(-1 as never).pipe(Effect.flip);
+      const error = yield* todos.getById(OWNER, -1 as never).pipe(Effect.flip);
       assert.strictEqual(error.reason._tag, "TodoNotFound");
     }),
   );

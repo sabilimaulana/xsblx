@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
 import { Todo, TodoCreate, TodoId, TodoUpdate } from "../domain/todo.ts";
 import { TodoNotFound } from "../domain/todo-errors.ts";
+import { Authentication } from "../middleware/authentication.ts";
 
 /** Path params arrive as strings, so bridge into the branded id with `decodeTo`. */
 const idParam = { id: Schema.FiniteFromString.pipe(Schema.decodeTo(TodoId)) };
@@ -32,5 +33,8 @@ export class TodosApiGroup extends HttpApiGroup.make("todos")
       error: TodoNotFound,
     }),
   )
+  // Every todo endpoint is scoped to the caller's session; the middleware adds
+  // `Unauthorized` to each of them and provides `CurrentUser` to the handlers.
+  .middleware(Authentication)
   .prefix("/todos")
   .annotateMerge(OpenApi.annotations({ title: "Todos" })) {}

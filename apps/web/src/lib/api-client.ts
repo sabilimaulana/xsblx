@@ -17,7 +17,16 @@ export class ApiClient extends Context.Service<ApiClient, HttpApiClient.ForApi<t
     HttpApiClient.make(Api, {
       transformClient: HttpClient.mapRequest(HttpClientRequest.prependUrl(baseUrl)),
     }),
-  ).pipe(Layer.provide(FetchHttpClient.layer));
+  ).pipe(
+    Layer.provide(
+      FetchHttpClient.layer.pipe(
+        // The API authenticates with the Better Auth session cookie, which is
+        // cross-origin (web on 3001, API on 3000), so fetch only sends it when
+        // credentials are included.
+        Layer.provide(Layer.succeed(FetchHttpClient.RequestInit)({ credentials: "include" })),
+      ),
+    ),
+  );
 }
 
 /**
