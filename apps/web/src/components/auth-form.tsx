@@ -36,28 +36,48 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   });
 
   return (
-    <div className="mx-auto flex max-w-sm flex-col gap-4 p-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{isSignUp ? "Create account" : "Sign in"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void form.handleSubmit();
-            }}
-          >
-            {isSignUp && (
-              <form.Field name="name">
+    <div className="flex min-h-svh items-center justify-center p-8">
+      <div className="w-full max-w-sm">
+        <Card>
+          <CardHeader>
+            <CardTitle>{isSignUp ? "Create account" : "Sign in"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void form.handleSubmit();
+              }}
+            >
+              {isSignUp && (
+                <form.Field name="name">
+                  {(field) => (
+                    <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                      <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        autoComplete="name"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(event) => field.handleChange(event.target.value)}
+                      />
+                      <FieldError errors={field.state.meta.errors} />
+                    </Field>
+                  )}
+                </form.Field>
+              )}
+
+              <form.Field name="email">
                 {(field) => (
                   <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-                    <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                    <FieldLabel htmlFor={field.name}>Email</FieldLabel>
                     <Input
                       id={field.name}
                       name={field.name}
-                      autoComplete="name"
+                      type="email"
+                      autoComplete="email"
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(event) => field.handleChange(event.target.value)}
@@ -66,63 +86,45 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
                   </Field>
                 )}
               </form.Field>
-            )}
 
-            <form.Field name="email">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-                  <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="email"
-                    autoComplete="email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
+              <form.Field name="password">
+                {(field) => (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="password"
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                )}
+              </form.Field>
 
-            <form.Field name="password">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="password"
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
+              {error !== null && <p className="text-destructive text-sm">{error}</p>}
 
-            {error !== null && <p className="text-destructive text-sm">{error}</p>}
+              <form.Subscribe selector={(state) => state.isSubmitting}>
+                {(isSubmitting) => (
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSignUp ? "Create account" : "Sign in"}
+                  </Button>
+                )}
+              </form.Subscribe>
+            </form>
 
-            <form.Subscribe selector={(state) => state.isSubmitting}>
-              {(isSubmitting) => (
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSignUp ? "Create account" : "Sign in"}
-                </Button>
-              )}
-            </form.Subscribe>
-          </form>
-
-          <p className="text-muted-foreground mt-4 text-sm">
-            {isSignUp ? "Already have an account? " : "No account yet? "}
-            <Link className="underline" to={isSignUp ? "/signin" : "/signup"}>
-              {isSignUp ? "Sign in" : "Sign up"}
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-muted-foreground mt-4 text-sm">
+              {isSignUp ? "Already have an account? " : "No account yet? "}
+              <Link className="underline" to={isSignUp ? "/signin" : "/signup"}>
+                {isSignUp ? "Sign in" : "Sign up"}
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

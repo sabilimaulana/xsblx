@@ -11,6 +11,10 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **Route protection tiers in `apps/web`.** Two pathless layout routes gate on the
+  session: `_protected` sends a signed-out visitor to `/signin`, `_guest` sends a
+  signed-in one to `/todos`, and a route left at the top level stays public. URLs
+  are unchanged — `/signin`, `/signup` and `/todos` keep their paths.
 - **Nitro build for `apps/web`** (`nitro` 3.0.260610-beta, `nitro/vite` plugin).
   `bun run build` now emits `.output/`, and `bun run start` serves
   `.output/server/index.mjs` — which serves `/assets/*` too, so the production
@@ -50,6 +54,8 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **Sign-in and sign-up cards are centred** in the viewport instead of sitting at
+  the top of the page.
 - **Server and API folded into feature-first directories** (ADR 0005): one
   feature is one directory per package, and the layer is the filename. Adding a
   feature adds a directory plus two import lines; deleting one is `rm -rf`.

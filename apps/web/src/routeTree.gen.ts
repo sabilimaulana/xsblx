@@ -10,63 +10,81 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SigninRouteImport } from './routes/signin'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as TodosRouteImport } from './routes/todos'
+import { Route as GuestRouteImport } from './routes/_guest'
+import { Route as ProtectedRouteImport } from './routes/_protected'
+import { Route as GuestSigninRouteImport } from './routes/_guest/signin'
+import { Route as GuestSignupRouteImport } from './routes/_guest/signup'
+import { Route as ProtectedTodosRouteImport } from './routes/_protected/todos'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SigninRoute = SigninRouteImport.update({
+const GuestRoute = GuestRouteImport.update({
+  id: '/_guest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedRoute = ProtectedRouteImport.update({
+  id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuestSigninRoute = GuestSigninRouteImport.update({
   id: '/signin',
   path: '/signin',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => GuestRoute,
 } as any)
-const SignupRoute = SignupRouteImport.update({
+const GuestSignupRoute = GuestSignupRouteImport.update({
   id: '/signup',
   path: '/signup',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => GuestRoute,
 } as any)
-const TodosRoute = TodosRouteImport.update({
+const ProtectedTodosRoute = ProtectedTodosRouteImport.update({
   id: '/todos',
   path: '/todos',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => ProtectedRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/signin': typeof SigninRoute
-  '/signup': typeof SignupRoute
-  '/todos': typeof TodosRoute
+  '/signin': typeof GuestSigninRoute
+  '/signup': typeof GuestSignupRoute
+  '/todos': typeof ProtectedTodosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/signin': typeof SigninRoute
-  '/signup': typeof SignupRoute
-  '/todos': typeof TodosRoute
+  '/signin': typeof GuestSigninRoute
+  '/signup': typeof GuestSignupRoute
+  '/todos': typeof ProtectedTodosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/signin': typeof SigninRoute
-  '/signup': typeof SignupRoute
-  '/todos': typeof TodosRoute
+  '/_guest': typeof GuestRouteWithChildren
+  '/_protected': typeof ProtectedRouteWithChildren
+  '/_guest/signin': typeof GuestSigninRoute
+  '/_guest/signup': typeof GuestSignupRoute
+  '/_protected/todos': typeof ProtectedTodosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths: '/' | '/signin' | '/signup' | '/todos'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/signin' | '/signup' | '/todos'
-  id: '__root__' | '/' | '/signin' | '/signup' | '/todos'
+  id:
+    | '__root__'
+    | '/'
+    | '/_guest'
+    | '/_protected'
+    | '/_guest/signin'
+    | '/_guest/signup'
+    | '/_protected/todos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SigninRoute: typeof SigninRoute
-  SignupRoute: typeof SignupRoute
-  TodosRoute: typeof TodosRoute
+  GuestRoute: typeof GuestRouteWithChildren
+  ProtectedRoute: typeof ProtectedRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -78,35 +96,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/signin': {
-      id: '/signin'
+    '/_guest': {
+      id: '/_guest'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof GuestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected': {
+      id: '/_protected'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ProtectedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_guest/signin': {
+      id: '/_guest/signin'
       path: '/signin'
       fullPath: '/signin'
-      preLoaderRoute: typeof SigninRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof GuestSigninRouteImport
+      parentRoute: typeof GuestRoute
     }
-    '/signup': {
-      id: '/signup'
+    '/_guest/signup': {
+      id: '/_guest/signup'
       path: '/signup'
       fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof GuestSignupRouteImport
+      parentRoute: typeof GuestRoute
     }
-    '/todos': {
-      id: '/todos'
+    '/_protected/todos': {
+      id: '/_protected/todos'
       path: '/todos'
       fullPath: '/todos'
-      preLoaderRoute: typeof TodosRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof ProtectedTodosRouteImport
+      parentRoute: typeof ProtectedRoute
     }
   }
 }
 
+interface GuestRouteChildren {
+  GuestSigninRoute: typeof GuestSigninRoute
+  GuestSignupRoute: typeof GuestSignupRoute
+}
+
+const GuestRouteChildren: GuestRouteChildren = {
+  GuestSigninRoute: GuestSigninRoute,
+  GuestSignupRoute: GuestSignupRoute,
+}
+
+const GuestRouteWithChildren = GuestRoute._addFileChildren(GuestRouteChildren)
+
+interface ProtectedRouteChildren {
+  ProtectedTodosRoute: typeof ProtectedTodosRoute
+}
+
+const ProtectedRouteChildren: ProtectedRouteChildren = {
+  ProtectedTodosRoute: ProtectedTodosRoute,
+}
+
+const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
+  ProtectedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SigninRoute: SigninRoute,
-  SignupRoute: SignupRoute,
-  TodosRoute: TodosRoute,
+  GuestRoute: GuestRouteWithChildren,
+  ProtectedRoute: ProtectedRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

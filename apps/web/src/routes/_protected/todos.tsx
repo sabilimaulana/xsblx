@@ -7,16 +7,11 @@ import { Field, FieldError } from "@xsblx/ui/components/field";
 import { Input } from "@xsblx/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { api, eq } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
-export const Route = createFileRoute("/todos")({
-  // The session cookie lives in the browser, so the API can only be called from
-  // there: an SSR pass would call it without credentials and get a 401.
-  ssr: false,
-  component: Todos,
-});
+export const Route = createFileRoute("/_protected/todos")({ component: Todos });
 
 const todosKey = ["todos"];
 
@@ -28,9 +23,8 @@ const listTodos = eq.queryOptions({
 function Todos() {
   const queryClient = useQueryClient();
   const { data: todos } = useQuery(listTodos);
-  // The session cookie only exists in the browser, so the gate is client-side.
-  // The API itself is closed too — handlers take the owner from the session.
-  const { data: session, isPending } = useSession();
+  // `_protected` already guarantees a session before this renders.
+  const { data: session } = useSession();
 
   // Refetching the list after a mutation keeps the server as the single source
   // of truth. Swap for optimistic updates only when latency is a real problem.
@@ -77,13 +71,10 @@ function Todos() {
     },
   });
 
-  if (isPending) return null;
-  if (!session) return <Navigate to="/signin" />;
-
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4 p-8">
       <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">{session.user.email}</span>
+        <span className="text-muted-foreground text-sm">{session?.user.email}</span>
         <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           Sign out
         </Button>
