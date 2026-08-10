@@ -5,15 +5,15 @@ Postgres, with the API contract shared between them as Effect `Schema`.
 
 ## Stack
 
-| Layer     | Choice                                                             |
-| --------- | ------------------------------------------------------------------ |
-| Runtime   | Bun workspaces                                                     |
-| Backend   | Effect `4.0.0-beta.103`, `@effect/platform-bun`, `@effect/sql-pg`   |
-| Database  | Postgres via `drizzle-orm` + `drizzle-kit`                         |
-| Auth      | Better Auth (runs outside the Effect runtime — ADR 0007)           |
-| Frontend  | TanStack Start / Router / Query / Form, React 19                   |
-| UI        | shadcn components in `packages/ui`, Tailwind 4                     |
-| Contract  | `packages/api` — `HttpApi` definition, schemas, domain errors       |
+| Layer    | Choice                                                            |
+| -------- | ----------------------------------------------------------------- |
+| Runtime  | Bun workspaces                                                    |
+| Backend  | Effect `4.0.0-beta.103`, `@effect/platform-bun`, `@effect/sql-pg` |
+| Database | Postgres via `drizzle-orm` + `drizzle-kit`                        |
+| Auth     | Better Auth (runs outside the Effect runtime — ADR 0007)          |
+| Frontend | TanStack Start / Router / Query / Form, React 19                  |
+| UI       | shadcn components in `packages/ui`, Tailwind 4                    |
+| Contract | `packages/api` — `HttpApi` definition, schemas, domain errors     |
 
 ## Layout
 
@@ -45,6 +45,11 @@ you can reach, an `AUTH_SECRET`, and S3 credentials. Then create the schema:
 bun run --filter server db:migrate
 ```
 
+To run the tests, also fill in `apps/server/.env.test` from
+`apps/server/.env.test.example`. It must point at a **separate** database: the
+test run truncates every table before each test (ADR 0004). The tests migrate it
+themselves.
+
 ## Running
 
 ```sh
@@ -62,8 +67,12 @@ CORS must keep `credentials: true` for the session cookie to survive (ADR 0008).
 bun run typecheck    # tsc + Effect diagnostics — treat TS377001 etc. as errors
 bun run lint
 bun run format:check
-bun run --filter server test   # hits a real Postgres (ADR 0004)
+bun run test         # server tests, against a real Postgres (ADR 0004)
 ```
+
+These four are exactly what CI runs (`.github/workflows/ci.yml`) on every push to
+`main` and every PR, with Postgres as a service container. Lefthook runs format
+and lint on staged files at commit time; CI is what covers the whole repo.
 
 ## Contributing
 

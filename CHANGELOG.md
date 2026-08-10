@@ -11,6 +11,15 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **CI** (`.github/workflows/ci.yml`). One job on pushes to `main` and every PR:
+  `typecheck`, `lint`, `format:check`, `test` — the last against a throwaway
+  Postgres service container. Lefthook only checks staged files, so nothing
+  verified the whole repo before this.
+- **Isolated test database.** Server tests read `DATABASE_URL` from
+  `apps/server/.env.test` (see `.env.test.example`) instead of `.env`, run the
+  real migrations before the suite, and truncate every table before each test —
+  `apps/server/src/test-db.ts`. Root `bun run test` runs them. Tests no longer
+  delete their own rows (ADR 0004).
 - **`README.md`.** Stack, layout, setup, run and check commands, and where the
   rules live for someone arriving at the repo cold.
 - **Documentation split.** `AGENTS.md` now carries only rules an agent can

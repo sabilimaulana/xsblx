@@ -59,7 +59,7 @@ the layer is the filename (ADR 0005).
 | Wiring         | `apps/server/src/index.ts`                       | Provides handler layers to the server.                                                      |
 | Client         | `apps/web/src/lib/api-client.ts`                 | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.   |
 | UI             | `apps/web/src/routes/todos.tsx`                  | `useQuery` reads, TanStack Form submits, `invalidateQueries` refetches.                     |
-| Test           | `apps/server/src/features/todos/service.test.ts` | `@effect/vitest` `layer(...)` integration test against real Postgres.                        |
+| Test           | `apps/server/src/features/todos/service.test.ts` | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
 
 Central by necessity, not feature-folded:
 
@@ -69,6 +69,10 @@ Central by necessity, not feature-folded:
 - `packages/api/src/api.ts` — composes the groups. Only job.
 
 Tests live beside the code they test (`src/**/*.test.ts`). No `test/` directory.
+
+`apps/server/src/test-db.ts` and `src/test-setup.ts` are the suite's own
+plumbing, not a feature: `.env.test` supplies `DATABASE_URL`, the real migrations
+run before the suite, and every table is truncated before each test (ADR 0004).
 
 ## Auth
 
@@ -80,7 +84,7 @@ and does not follow the slice (ADR 0007).
 | Config    | `apps/server/src/features/auth/auth.ts`         | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
 | Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                 |
 | Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
-| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`.                                     |
+| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`.                                    |
 | Contract  | `packages/api/src/features/auth/middleware.ts`  | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                 |
 | Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
 | Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                |

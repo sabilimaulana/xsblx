@@ -9,9 +9,9 @@ updated: 2026-08-10
 What we build and why. Technical decisions live in
 [`../technical/`](../technical/).
 
-| Doc                                        | Status |
-| ------------------------------------------ | ------ |
-| [PRD template](./prd-template.md)          | active |
+| Doc                               | Status |
+| --------------------------------- | ------ |
+| [PRD template](./prd-template.md) | active |
 
 No PRDs yet. `todos` is a reference slice, not a product feature — it exists to
 show the shape (ADR 0005), so it never had a PRD and does not need one

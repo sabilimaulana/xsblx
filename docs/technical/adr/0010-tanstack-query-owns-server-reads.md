@@ -25,9 +25,9 @@ ergonomics buys nothing that the `effect-query` bridge does not already provide.
 
 | State                 | Owner                                                               |
 | --------------------- | ------------------------------------------------------------------- |
-| Server data (reads)   | TanStack Query `useQuery`, `queryClient.invalidateQueries` on write  |
+| Server data (reads)   | TanStack Query `useQuery`, `queryClient.invalidateQueries` on write |
 | Form state            | TanStack Form (ADR 0009)                                            |
-| Effect → React bridge | `eq` + `api` in `apps/web/src/lib/api-client.ts` (`effect-query`)    |
+| Effect → React bridge | `eq` + `api` in `apps/web/src/lib/api-client.ts` (`effect-query`)   |
 
 `createEffectQueryFromManagedRuntime` turns an Effect into
 `queryOptions` / `mutationOptions`; `api((client) => …)` supplies `ApiClient`.

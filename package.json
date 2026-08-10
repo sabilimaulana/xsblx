@@ -32,6 +32,7 @@
     "dev:web": "bun run --filter web dev",
     "dev:server": "bun run --filter server dev",
     "build": "bun run --filter web build",
+    "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "oxlint --disable-nested-config",
     "format": "oxfmt --disable-nested-config",

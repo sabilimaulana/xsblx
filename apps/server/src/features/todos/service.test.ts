@@ -7,13 +7,15 @@ import { Todos } from "./service.ts";
 const OWNER = "test-user-owner";
 const OTHER = "test-user-other";
 
-/** Todos are owned, so the owners have to exist before anything can be created. */
+/**
+ * Todos are owned, so the owners have to exist before anything can be created.
+ * Every test starts from a truncated database, so this reseeds each time.
+ */
 const seedUsers = Effect.gen(function* () {
   const db = yield* Drizzle;
   yield* db
     .insert(user)
     .values([OWNER, OTHER].map((id) => ({ id, name: id, email: `${id}@example.test` })))
-    .onConflictDoNothing()
     .pipe(Effect.orDie);
 });
 
@@ -38,7 +40,10 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
       assert.strictEqual(completed.completed, true);
 
       const listed = yield* todos.list(OWNER);
-      assert.isTrue(listed.some((todo) => todo.id === created.id));
+      assert.deepStrictEqual(
+        listed.map((todo) => todo.id),
+        [created.id],
+      );
 
       yield* todos.remove(OWNER, created.id);
 
@@ -66,8 +71,6 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
       assert.strictEqual(deleted.reason._tag, "TodoNotFound");
 
       assert.isEmpty(yield* todos.list(OTHER));
-
-      yield* todos.remove(OWNER, created.id);
     }),
   );
 

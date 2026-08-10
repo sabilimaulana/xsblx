@@ -17,20 +17,20 @@ Do **not** write an ADR for a standing constraint on how work is done — that
 belongs in `AGENTS.md`. Test: can a later decision supersede it? → ADR. Is it a
 rule you obey on every edit? → `AGENTS.md`.
 
-| #    | Decision                                                                                                             | Status   |
-| ---- | -------------------------------------------------------------------------------------------------------------------- | -------- |
-| 0001 | [Shared schemas live in `packages/api`](./0001-shared-schemas-in-packages-api.md)                                    | accepted |
-| 0002 | [Effect pinned to 4.0.0-beta.103](./0002-pin-effect-beta-103.md)                                                     | accepted |
-| 0003 | [Services own SQL and domain errors](./0003-services-own-sql-and-domain-errors.md)                                   | accepted |
-| 0004 | [Tests hit real Postgres](./0004-tests-hit-real-postgres.md)                                                         | accepted |
-| 0005 | [Feature-first slices](./0005-feature-first-slices.md)                                                               | accepted |
-| 0006 | [Exactly one workspace depends on `vite`](./0006-exactly-one-vite-dependent.md)                                      | accepted |
-| 0007 | [Better Auth runs outside Effect](./0007-better-auth-outside-effect.md)                                              | accepted |
-| 0008 | [Two origins, CORS with credentials](./0008-two-origins-cors-with-credentials.md)                                    | accepted |
-| 0009 | [Effect Schema is the only validator](./0009-effect-schema-is-the-only-validator.md)                                 | accepted |
-| 0010 | [TanStack Query owns server reads](./0010-tanstack-query-owns-server-reads.md)                                       | accepted |
-| 0011 | [shadcn registry before hand-written primitives](./0011-shadcn-registry-before-hand-written-primitives.md)           | accepted |
-| 0012 | [Vendored repos are reference, not dependencies](./0012-vendored-repos-as-reference-not-dependencies.md)              | accepted |
+| #    | Decision                                                                                                   | Status   |
+| ---- | ---------------------------------------------------------------------------------------------------------- | -------- |
+| 0001 | [Shared schemas live in `packages/api`](./0001-shared-schemas-in-packages-api.md)                          | accepted |
+| 0002 | [Effect pinned to 4.0.0-beta.103](./0002-pin-effect-beta-103.md)                                           | accepted |
+| 0003 | [Services own SQL and domain errors](./0003-services-own-sql-and-domain-errors.md)                         | accepted |
+| 0004 | [Tests hit real Postgres](./0004-tests-hit-real-postgres.md)                                               | accepted |
+| 0005 | [Feature-first slices](./0005-feature-first-slices.md)                                                     | accepted |
+| 0006 | [Exactly one workspace depends on `vite`](./0006-exactly-one-vite-dependent.md)                            | accepted |
+| 0007 | [Better Auth runs outside Effect](./0007-better-auth-outside-effect.md)                                    | accepted |
+| 0008 | [Two origins, CORS with credentials](./0008-two-origins-cors-with-credentials.md)                          | accepted |
+| 0009 | [Effect Schema is the only validator](./0009-effect-schema-is-the-only-validator.md)                       | accepted |
+| 0010 | [TanStack Query owns server reads](./0010-tanstack-query-owns-server-reads.md)                             | accepted |
+| 0011 | [shadcn registry before hand-written primitives](./0011-shadcn-registry-before-hand-written-primitives.md) | accepted |
+| 0012 | [Vendored repos are reference, not dependencies](./0012-vendored-repos-as-reference-not-dependencies.md)   | accepted |
 
 Template:
 

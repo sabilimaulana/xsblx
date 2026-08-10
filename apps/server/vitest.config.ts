@@ -1,14 +1,20 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// Bun loads this app's .env at runtime, but vitest runs on Node, so load it
-// explicitly. Deliberately not vite's `loadEnv`: a second workspace depending on
-// `vite` makes bun install a second copy of it, and TanStack Start's dev server
+// Only `.env.test` is loaded, never `.env`: tests truncate every table, so
+// pointing them at the development database would delete your own data. A
+// missing file fails loudly here, which is the intent.
+//
+// Deliberately not vite's `loadEnv`: a second workspace depending on `vite`
+// makes bun install a second copy of it, and TanStack Start's dev server
 // middleware is skipped when its `vite` is not the one running the dev server.
-process.loadEnvFile(fileURLToPath(new URL(".env", import.meta.url)));
+process.loadEnvFile(fileURLToPath(new URL(".env.test", import.meta.url)));
 
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
+    setupFiles: ["./src/test-setup.ts"],
+    // One shared test database, so files take turns. See the note in test-setup.ts.
+    fileParallelism: false,
   },
 });
