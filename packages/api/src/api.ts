@@ -1,6 +1,6 @@
 import { HttpApi, OpenApi } from "effect/unstable/httpapi";
-import { HealthApiGroup } from "./groups/health.ts";
-import { TodosApiGroup } from "./groups/todos.ts";
+import { HealthApiGroup } from "./features/health/group.ts";
+import { TodosApiGroup } from "./features/todos/group.ts";
 
 export class Api extends HttpApi.make("api")
   .add(HealthApiGroup)

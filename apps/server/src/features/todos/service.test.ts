@@ -1,8 +1,8 @@
 import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { Drizzle, DrizzleLive } from "../src/db/index.ts";
-import { user } from "../src/db/schema.ts";
-import { Todos } from "../src/todos.ts";
+import { Drizzle, DrizzleLive } from "../../db/index.ts";
+import { user } from "../auth/schema.ts";
+import { Todos } from "./service.ts";
 
 const OWNER = "test-user-owner";
 const OTHER = "test-user-other";

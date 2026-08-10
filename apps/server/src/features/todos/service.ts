@@ -1,9 +1,9 @@
-import { Todo, TodoId } from "@xsblx/api/domain/todo";
-import { TodoNotFound, TodosError } from "@xsblx/api/domain/todo-errors";
+import { Todo, TodoId } from "@xsblx/api/todos/todo";
+import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
-import { Drizzle, DrizzleLive } from "./db/index.ts";
-import { todos } from "./db/schema.ts";
+import { Drizzle, DrizzleLive } from "../../db/index.ts";
+import { todos } from "./schema.ts";
 
 type TodoRow = typeof todos.$inferSelect;
 

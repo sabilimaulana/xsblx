@@ -1,8 +1,8 @@
-import { MIN_PASSWORD_LENGTH } from "@xsblx/api/domain/auth";
+import { MIN_PASSWORD_LENGTH } from "@xsblx/api/auth/credentials";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/bun-sql";
-import * as authSchema from "./db/schema.ts";
+import * as authSchema from "./schema.ts";
 
 /**
  * Better Auth owns its own connection: it is a plain (non-Effect) library and

@@ -57,20 +57,38 @@ None of this overrides: input validation at trust boundaries, error handling tha
 `todos` is the worked example of a full vertical slice, DB → HTTP → UI. Copy its
 shape for new features; if a new feature cannot follow it, say why before diverging.
 
-| Layer          | File                                            | Responsibility                                                                              |
-| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Domain         | `packages/api/src/domain/todo.ts`               | `Schema.Class` + branded id. No IO, no framework types.                                     |
-| Domain errors  | `packages/api/src/domain/todo-errors.ts`        | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
-| API definition | `packages/api/src/groups/todos.ts`              | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
-| Auth contract  | `packages/api/src/middleware/authentication.ts` | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                                 |
-| API root       | `packages/api/src/api.ts`                       | Composes every group into `Api`.                                                            |
-| Persistence    | `apps/server/src/db/schema.ts`                  | Drizzle table. `bun run db:generate` then `db:migrate`.                                     |
-| Service        | `apps/server/src/todos.ts`                      | `Context.Service` + `Layer`. Owns business rules and SQL; maps rows to domain types.        |
-| Handlers       | `apps/server/src/http/todos.ts`                 | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
-| Wiring         | `apps/server/src/index.ts`                      | Provides handler layers to the server.                                                      |
-| Client         | `apps/web/src/lib/api-client.ts`                | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.                          |
-| UI             | `apps/web/src/routes/todos.tsx`                 | `useQuery` reads, TanStack Form submits, `invalidateQueries` refetches.                     |
-| Test           | `apps/server/test/todos.test.ts`                | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
+Code is **feature-first**: one feature is one directory in each package, and the
+layer is the file name inside it, not a directory above it. Adding a feature adds a
+directory plus two import lines (`packages/api/src/api.ts` and
+`apps/server/src/index.ts`); deleting one is `rm -rf`.
+
+| Layer          | File                                             | Responsibility                                                                              |
+| -------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Domain         | `packages/api/src/features/todos/todo.ts`        | `Schema.Class` + branded id. No IO, no framework types.                                     |
+| Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
+| API definition | `packages/api/src/features/todos/group.ts`       | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
+| Auth contract  | `packages/api/src/features/auth/middleware.ts`   | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                                 |
+| API root       | `packages/api/src/api.ts`                        | Composes every group into `Api`.                                                            |
+| Persistence    | `apps/server/src/features/todos/schema.ts`       | Drizzle table. `bun run db:generate` then `db:migrate`.                                     |
+| Service        | `apps/server/src/features/todos/service.ts`      | `Context.Service` + `Layer`. Owns business rules and SQL; maps rows to domain types.        |
+| Handlers       | `apps/server/src/features/todos/http.ts`         | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
+| Wiring         | `apps/server/src/index.ts`                       | Provides handler layers to the server.                                                      |
+| Client         | `apps/web/src/lib/api-client.ts`                 | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.   |
+| UI             | `apps/web/src/routes/todos.tsx`                  | `useQuery` reads, TanStack Form submits, `invalidateQueries` refetches.                     |
+| Test           | `apps/server/src/features/todos/service.test.ts` | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
+
+`packages/api` exports one subpath per feature file: `@xsblx/api/<feature>/<file>`
+(`"./*": "./src/features/*.ts"`), plus `@xsblx/api/api` for the root.
+
+Two things stay central and must not be feature-folded:
+
+- `apps/server/src/db/schema.ts` is a **barrel** re-exporting every
+  `features/*/schema.ts`. drizzle-kit takes a single schema entry and
+  `defineRelations` (`db/relations.ts`) needs all tables at once.
+- `packages/api/src/api.ts` composes the groups. That is its only job.
+
+Tests live beside the code they test (`src/**/*.test.ts`); there is no `test/`
+directory.
 
 Rules the slice encodes:
 
@@ -89,7 +107,7 @@ library — Effect `Schema` is the only one.
 Validate against the API's own schema, exported as a Standard Schema:
 
 ```ts
-// packages/api/src/domain/todo.ts
+// packages/api/src/features/todos/todo.ts
 export const TodoCreateStandard = Schema.toStandardSchemaV1(TodoCreate);
 
 // route
@@ -121,11 +139,11 @@ This is why `apps/server/vitest.config.ts` uses `process.loadEnvFile` instead of
 
 Who owns what today — do not add a second owner for the same state:
 
-| State                 | Owner                                                                    |
-| --------------------- | ------------------------------------------------------------------------ |
-| Server data (reads)   | TanStack Query `useQuery` + `queryClient.invalidateQueries` on mutation   |
-| Form state            | TanStack Form                                                            |
-| Effect → React bridge | `eq` + `api` in `apps/web/src/lib/api-client.ts` (`effect-query`)         |
+| State                 | Owner                                                                   |
+| --------------------- | ----------------------------------------------------------------------- |
+| Server data (reads)   | TanStack Query `useQuery` + `queryClient.invalidateQueries` on mutation |
+| Form state            | TanStack Form                                                           |
+| Effect → React bridge | `eq` + `api` in `apps/web/src/lib/api-client.ts` (`effect-query`)       |
 
 `QueryClient` is created once at module scope in `__root.tsx`; every query-backed
 route sets `ssr: false` (the session cookie is browser-only), so there is no
@@ -246,15 +264,15 @@ When writing effect-machine code, inspect `repos/effect-machine/` for examples o
 Email + password only. Better Auth is a plain library that runs **outside** the
 Effect runtime; it is not wrapped in a service and does not follow the todos slice.
 
-| Layer     | File                                    | Responsibility                                                              |
-| --------- | --------------------------------------- | --------------------------------------------------------------------------- |
-| Config    | `apps/server/src/auth.ts`               | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
-| Schema    | `apps/server/src/db/schema.ts`          | Auth tables live beside `todos` in the one schema file. Regen below.        |
-| Relations | `apps/server/src/db/relations.ts`       | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
-| Mount     | `apps/server/src/http/auth.ts`          | Raw `HttpRouter` route at `/api/auth/*`.                                    |
-| Shared    | `packages/api/src/domain/auth.ts`       | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
-| Client    | `apps/web/src/lib/auth-client.ts`       | `createAuthClient` from `better-auth/react`.                                |
-| UI        | `apps/web/src/components/auth-form.tsx` | One form, both modes. Routes `/signin`, `/signup`.                          |
+| Layer     | File                                            | Responsibility                                                              |
+| --------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
+| Config    | `apps/server/src/features/auth/auth.ts`         | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
+| Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel. Regen below.    |
+| Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
+| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`.                                    |
+| Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
+| Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                |
+| UI        | `apps/web/src/components/auth-form.tsx`         | One form, both modes. Routes `/signin`, `/signup`.                          |
 
 Rules:
 
@@ -265,14 +283,14 @@ Rules:
   headers merges multiple `set-cookie` values into one broken cookie.
 - **CORS must set `credentials: true`.** The session cookie is cross-origin
   (web on 3001, API on 3000) and the client sends `credentials: "include"`.
-- **Credential rules live once** in `packages/api/src/domain/auth.ts`: the server
+- **Credential rules live once** in `packages/api/src/features/auth/credentials.ts`: the server
   passes `minPasswordLength`, the forms validate against the Standard Schemas.
-- **`auth.ts`, `db/schema.ts` and `lib/auth-client.ts` are exempted** from
+- **`auth.ts`, `features/auth/schema.ts` and `lib/auth-client.ts` are exempted** from
   `processEnv`/`globalDate`/`asyncFunction` in `tsconfig.effect.json` — they are
   the code that legitimately runs outside Effect.
 - **The API is closed, not just the UI.** `TodosApiGroup` carries
-  `.middleware(Authentication)` (`packages/api/src/middleware/authentication.ts`),
-  implemented in `apps/server/src/http/authentication.ts` by resolving the session
+  `.middleware(Authentication)` (`packages/api/src/features/auth/middleware.ts`),
+  implemented in `apps/server/src/features/auth/middleware.ts` by resolving the session
   cookie through `auth.api.getSession`. It provides `CurrentUser`; handlers take the
   owner id from there and never from a payload. `Todos` filters every query by
   `userId`, and another user's row surfaces as `TodoNotFound`, not a 403.
@@ -283,13 +301,13 @@ Rules:
 Regenerating the auth tables: the `auth` CLI runs under node/jiti and cannot import
 `drizzle-orm/bun-sql`, so point it at a throwaway config that uses
 `drizzleAdapter({} as never, { provider: "pg" })`, generate to a scratch file, then
-hand-merge the table definitions into `src/db/schema.ts`. Drop the generated
+hand-merge the table definitions into `src/features/auth/schema.ts`. Drop the generated
 `relations(...)` block — drizzle 1.0-rc moved that API and relations live in
 `src/db/relations.ts` via `defineRelations`.
 
 ```
 bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
-# merge tables into src/db/schema.ts, then:
+# merge tables into src/features/auth/schema.ts, then:
 bun run db:generate && bun run db:migrate
 ```
 

@@ -5,9 +5,7 @@
   "type": "module",
   "exports": {
     "./api": "./src/api.ts",
-    "./domain/*": "./src/domain/*.ts",
-    "./groups/*": "./src/groups/*.ts",
-    "./middleware/*": "./src/middleware/*.ts"
+    "./*": "./src/features/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

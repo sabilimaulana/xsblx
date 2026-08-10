@@ -4,10 +4,10 @@ import { Effect, Layer } from "effect";
 import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { CorsConfig, ServerConfig } from "./config.ts";
-import { AuthRoutes } from "./http/auth.ts";
-import { AuthenticationLive } from "./http/authentication.ts";
-import { HealthHandlers } from "./http/health.ts";
-import { TodosApiHandlers } from "./http/todos.ts";
+import { AuthRoutes } from "./features/auth/http.ts";
+import { AuthenticationLive } from "./features/auth/middleware.ts";
+import { HealthHandlers } from "./features/health/http.ts";
+import { TodosApiHandlers } from "./features/todos/http.ts";
 
 const ApiRoutes = Layer.mergeAll(
   HttpApiBuilder.layer(Api, {

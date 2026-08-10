@@ -1,4 +1,4 @@
-import { SignInStandard, SignUpStandard } from "@xsblx/api/domain/auth";
+import { SignInStandard, SignUpStandard } from "@xsblx/api/auth/credentials";
 import { Button } from "@xsblx/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/card";
 import { Field, FieldError, FieldLabel } from "@xsblx/ui/components/field";

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
-import { auth } from "../auth.ts";
+import { auth } from "./auth.ts";
 
 /**
  * Better Auth ships its own web-standard `Request -> Response` handler, so it is

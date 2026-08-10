@@ -69,7 +69,7 @@
           {
             // Better Auth is a plain library: it boots outside the Effect
             // runtime and its drizzle schema is CLI-generated.
-            "include": ["**/auth.ts", "**/db/schema.ts", "**/lib/auth-client.ts"],
+            "include": ["**/auth.ts", "**/features/auth/schema.ts", "**/lib/auth-client.ts"],
             "options": {
               "diagnosticSeverity": {
                 "processEnv": "off",

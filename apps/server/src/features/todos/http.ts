@@ -1,9 +1,9 @@
 import { Api } from "@xsblx/api/api";
-import type { TodosError } from "@xsblx/api/domain/todo-errors";
-import { CurrentUser } from "@xsblx/api/middleware/authentication";
+import type { TodosError } from "@xsblx/api/todos/errors";
+import { CurrentUser } from "@xsblx/api/auth/middleware";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { Todos } from "../todos.ts";
+import { Todos } from "./service.ts";
 
 /**
  * `TodoNotFound` is the only reason the API models; anything else is a bug and

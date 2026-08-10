@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
-import { Todo, TodoCreate, TodoId, TodoUpdate } from "../domain/todo.ts";
-import { TodoNotFound } from "../domain/todo-errors.ts";
-import { Authentication } from "../middleware/authentication.ts";
+import { Todo, TodoCreate, TodoId, TodoUpdate } from "./todo.ts";
+import { TodoNotFound } from "./errors.ts";
+import { Authentication } from "../auth/middleware.ts";
 
 /** Path params arrive as strings, so bridge into the branded id with `decodeTo`. */
 const idParam = { id: Schema.FiniteFromString.pipe(Schema.decodeTo(TodoId)) };

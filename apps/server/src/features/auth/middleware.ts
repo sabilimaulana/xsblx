@@ -1,7 +1,7 @@
-import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/middleware/authentication";
+import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/auth/middleware";
 import { Effect, Layer } from "effect";
 import { HttpServerRequest } from "effect/unstable/http";
-import { auth } from "../auth.ts";
+import { auth } from "./auth.ts";
 
 /**
  * Resolves the session cookie into `CurrentUser`. Better Auth runs outside the
