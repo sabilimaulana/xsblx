@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { TodoId } from "./todo.ts";
+import { TodoId } from "./schema.ts";
 
 export class TodoNotFound extends Schema.TaggedErrorClass<TodoNotFound>()(
   "TodoNotFound",

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi";
-import { Todo, TodoCreate, TodoId, TodoUpdate } from "./todo.ts";
+import { Todo, TodoCreate, TodoId, TodoUpdate } from "./schema.ts";
 import { TodoNotFound } from "./errors.ts";
 import { Authentication } from "../auth/middleware.ts";
 

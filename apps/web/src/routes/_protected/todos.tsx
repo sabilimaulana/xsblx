@@ -1,5 +1,5 @@
-import type { TodoId } from "@xsblx/api/todos/todo";
-import { TodoCreateStandard } from "@xsblx/api/todos/todo";
+import type { TodoId } from "@xsblx/api/todos/schema";
+import { TodoCreateStandard } from "@xsblx/api/todos/schema";
 import { Button } from "@xsblx/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/card";
 import { Checkbox } from "@xsblx/ui/components/checkbox";

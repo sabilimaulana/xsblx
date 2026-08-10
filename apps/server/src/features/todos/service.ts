@@ -1,4 +1,4 @@
-import { Todo, TodoId } from "@xsblx/api/todos/todo";
+import { Todo, TodoId } from "@xsblx/api/todos/schema";
 import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";

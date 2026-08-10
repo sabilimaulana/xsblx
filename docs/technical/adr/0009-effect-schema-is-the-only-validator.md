@@ -24,7 +24,7 @@ the shadcn `field` primitives, validating against the API's own schema exported 
 a Standard Schema:
 
 ```ts
-// packages/api/src/features/todos/todo.ts
+// packages/api/src/features/todos/schema.ts
 export const TodoCreateStandard = Schema.toStandardSchemaV1(TodoCreate);
 ```
 

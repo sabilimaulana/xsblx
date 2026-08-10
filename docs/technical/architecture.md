@@ -49,7 +49,7 @@ the layer is the filename (ADR 0005).
 
 | Layer          | File                                             | Responsibility                                                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Domain         | `packages/api/src/features/todos/todo.ts`        | `Schema.Class` + branded id. No IO, no framework types.                                     |
+| Domain         | `packages/api/src/features/todos/schema.ts`        | `Schema.Class` + branded id. No IO, no framework types.                                     |
 | Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
 | API definition | `packages/api/src/features/todos/group.ts`       | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
 | API root       | `packages/api/src/api.ts`                        | Composes every group into `Api`.                                                            |
