@@ -13,9 +13,11 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.0-rc.4",
     "@effect/platform-bun": "catalog:effect",
     "@effect/sql-pg": "catalog:effect",
     "@xsblx/api": "workspace:*",
+    "better-auth": "1.7.0-rc.4",
     "drizzle-orm": "1.0.0-rc.4",
     "effect": "catalog:effect"
   },

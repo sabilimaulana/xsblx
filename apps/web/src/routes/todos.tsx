@@ -6,8 +6,9 @@ import { Checkbox } from "@xsblx/ui/components/checkbox";
 import { Field, FieldError } from "@xsblx/ui/components/field";
 import { Input } from "@xsblx/ui/components/input";
 import { useForm } from "@tanstack/react-form";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { Navigate, createFileRoute, useRouter } from "@tanstack/react-router";
 import { runApi } from "@/lib/api-client";
+import { signOut, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/todos")({
   // Loader results are serialized to the browser, and the serializer only handles
@@ -21,6 +22,9 @@ export const Route = createFileRoute("/todos")({
 function Todos() {
   const todos = Route.useLoaderData();
   const router = useRouter();
+  // The session cookie only exists in the browser, so the gate is client-side.
+  // The API itself is still open — authorizing todos is a separate change.
+  const { data: session, isPending } = useSession();
 
   // Reloading the route after a mutation keeps the server as the single source
   // of truth. Swap for optimistic updates only when latency is a real problem.
@@ -50,8 +54,17 @@ function Todos() {
     await refresh();
   };
 
+  if (isPending) return null;
+  if (!session) return <Navigate to="/signin" />;
+
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4 p-8">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-sm">{session.user.email}</span>
+        <Button variant="ghost" size="sm" onClick={() => void signOut()}>
+          Sign out
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Todos</CardTitle>

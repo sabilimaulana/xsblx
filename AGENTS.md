@@ -8,8 +8,8 @@ Bun workspace monorepo. TypeScript 7 everywhere. oxlint (`.oxlintrc.json`) + oxf
 | -------------- | ----------------------------------------------------------------------------------- | -------- |
 | `apps/server`  | Effect 4 (beta.103) + `@effect/platform-bun`, `HttpApi`, drizzle + `@effect/sql-pg` | 3000     |
 | `apps/web`     | TanStack Start + TanStack Form (React 19, Vite 8, Tailwind 4)                       | 3001     |
-| `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`)     | —        |
-| `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`         | —        |
+| `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`)      | —        |
+| `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`          | —        |
 
 Scripts from the repo root: `bun run dev` (all), `dev:web`, `dev:server`, `build`, `typecheck`.
 
@@ -108,11 +108,11 @@ about what is valid, that is the bug.
 
 Who owns what today — do not add a second owner for the same state:
 
-| State                  | Owner                                                    |
-| ---------------------- | -------------------------------------------------------- |
-| Server data (reads)    | Route loader + `router.invalidate()` after every mutation |
-| Form state             | TanStack Form                                            |
-| Effect → React bridge  | `runApi` in `apps/web/src/lib/api-client.ts`              |
+| State                 | Owner                                                     |
+| --------------------- | --------------------------------------------------------- |
+| Server data (reads)   | Route loader + `router.invalidate()` after every mutation |
+| Form state            | TanStack Form                                             |
+| Effect → React bridge | `runApi` in `apps/web/src/lib/api-client.ts`              |
 
 No client state library is installed, and none is needed for request/response
 CRUD. `@effect-atom/atom-react` is the intended answer, but only once the web app
@@ -229,4 +229,47 @@ When writing effect-query code, inspect `repos/effect-query/` for examples of id
 
 When writing effect-machine code, inspect `repos/effect-machine/` for examples of idiomatic usage, tests, module structure, and API design. Treat it as the source of truth for effect-machine patterns. Read `repos/effect-machine/AGENTS.md` before writing any effect-machine code.
 
-Vendored: Effect v4.0.0-beta.103 (tag `effect@4.0.0-beta.103`), Alchemy v2.0.0-beta.70 (tag `v2.0.0-beta.70`), effect-query v1.0.4 (tag `v1.0.4`), effect-machine v0.3.0 (tag `@typeonce/effect-machine@0.3.0`).
+## Auth — Better Auth 1.7.0-rc.4
+
+Email + password only. Better Auth is a plain library that runs **outside** the
+Effect runtime; it is not wrapped in a service and does not follow the todos slice.
+
+| Layer   | File                                     | Responsibility                                                    |
+| ------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| Config  | `apps/server/src/auth.ts`                | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
+| Schema  | `apps/server/src/db/auth-schema.ts`      | **Generated** — do not hand-edit. See regeneration below.         |
+| Mount   | `apps/server/src/http/auth.ts`           | Raw `HttpRouter` route at `/api/auth/*`.                          |
+| Shared  | `packages/api/src/domain/auth.ts`        | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).     |
+| Client  | `apps/web/src/lib/auth-client.ts`        | `createAuthClient` from `better-auth/react`.                      |
+| UI      | `apps/web/src/components/auth-form.tsx`  | One form, both modes. Routes `/signin`, `/signup`.                |
+
+Rules:
+
+- **Auth routes are not in `packages/api`.** Better Auth owns that contract and
+  generates the client's types from the server instance. Everything else still
+  goes through `Api` + `runApi`.
+- **The raw route passes the web `Response` through untouched** — flattening its
+  headers merges multiple `set-cookie` values into one broken cookie.
+- **CORS must set `credentials: true`.** The session cookie is cross-origin
+  (web on 3001, API on 3000) and the client sends `credentials: "include"`.
+- **Credential rules live once** in `packages/api/src/domain/auth.ts`: the server
+  passes `minPasswordLength`, the forms validate against the Standard Schemas.
+- **`auth.ts`, `db/auth-schema.ts` and `lib/auth-client.ts` are exempted** from
+  `processEnv`/`globalDate`/`asyncFunction` in `tsconfig.effect.json` — they are
+  the code that legitimately runs outside Effect.
+- The `/todos` gate is client-side (`useSession`). The API itself is still open;
+  authorizing todos per user is a separate change.
+
+Regenerating the schema: the `auth` CLI runs under node/jiti and cannot import
+`drizzle-orm/bun-sql`, so point it at a throwaway config that uses
+`drizzleAdapter({} as never, { provider: "pg" })`, then delete the generated
+`relations(...)` block (drizzle 1.0-rc moved that API):
+
+```
+bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output src/db/auth-schema.ts -y
+bun run db:generate && bun run db:migrate
+```
+
+Env: `AUTH_URL`, `AUTH_SECRET`, `CORS_ALLOWED_ORIGINS` in `apps/server/.env`.
+
+Vendored: Effect v4.0.0-beta.103 (tag `effect@4.0.0-beta.103`), Alchemy v2.0.0-beta.70 (tag `v2.0.0-beta.70`), effect-query v1.0.4 (tag `v1.0.4`), effect-machine v0.3.0 (tag `@typeonce/effect-machine@0.3.0`), better-auth v1.7.0-rc.4 (tag `v1.7.0-rc.4`).

@@ -67,6 +67,19 @@
             }
           },
           {
+            // Better Auth is a plain library: it boots outside the Effect
+            // runtime and its drizzle schema is CLI-generated.
+            "include": ["**/auth.ts", "**/db/auth-schema.ts", "**/lib/auth-client.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "processEnv": "off",
+                "globalDate": "off",
+                "asyncFunction": "off",
+                "newPromise": "off"
+              }
+            }
+          },
+          {
             // React/TanStack callbacks (route loaders, form onSubmit) are async
             // by API contract; Effect only enters apps/web through runApi.
             "include": ["**/*.tsx", "**/routes/**"],
