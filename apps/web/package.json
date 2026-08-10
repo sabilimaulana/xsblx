@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3001",
+    "dev": "vite dev",
     "generate-routes": "tsr generate",
     "build": "vite build",
+    "start": "bun dist/server/server.js",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

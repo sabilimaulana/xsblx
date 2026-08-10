@@ -36,6 +36,7 @@ is the filename (ADR 0005). `features/todos/` is the reference slice.
 bun install
 ./scripts/vendor.sh                  # optional: reference sources into repos/
 cp apps/server/.env.example apps/server/.env
+cp apps/web/.env.example apps/web/.env
 ```
 
 Fill in `apps/server/.env` — it needs a `DATABASE_URL` pointing at a Postgres
@@ -56,7 +57,16 @@ themselves.
 bun run dev          # both apps
 bun run dev:web      # web only, port 3001
 bun run dev:server   # server only, port 3000
+
+bun run build        # production build of web → apps/web/dist
+bun run start        # run that build plus the server
+bun run start:web
+bun run start:server
 ```
+
+Ports come from `PORT` in each app's `.env` (`apps/web` 3001, `apps/server` 3000) and apply to `dev` and `start` alike — change the env, not a script. The
+database commands are `bun run db:generate | db:migrate | db:push | db:pull |
+db:check | db:up | db:studio`.
 
 The web app expects the server at the origin listed in `CORS_ALLOWED_ORIGINS`;
 CORS must keep `credentials: true` for the session cookie to survive (ADR 0008).

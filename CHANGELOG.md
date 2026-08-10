@@ -11,6 +11,14 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **Root `bun run start`** runs the production build of both apps
+  (`start:web`, `start:server`); `apps/web` gained a `start` that serves
+  `dist/server/server.js` from `bun run build`.
+- **`apps/web/.env`** (from `.env.example`): `PORT` — default 3001, honoured by
+  `dev`, `preview` and the production `start` — and `VITE_API_URL`. No port is
+  hardcoded in a script any more.
+- **Root `db:*` scripts** forward to `apps/server`'s drizzle-kit, which now also
+  exposes `db:pull`, `db:check` and `db:up` alongside generate/migrate/push/studio.
 - **CI** (`.github/workflows/ci.yml`). One job on pushes to `main` and every PR:
   `typecheck`, `lint`, `format:check`, `test` — the last against a throwaway
   Postgres service container. Lefthook only checks staged files, so nothing
