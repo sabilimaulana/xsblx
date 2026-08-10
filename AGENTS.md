@@ -7,7 +7,7 @@ Bun workspace monorepo. TypeScript 7 everywhere. oxlint (`.oxlintrc.json`) + oxf
 | Path           | Stack                                                                               | Dev port |
 | -------------- | ----------------------------------------------------------------------------------- | -------- |
 | `apps/server`  | Effect 4 (beta.103) + `@effect/platform-bun`, `HttpApi`, drizzle + `@effect/sql-pg` | 3000     |
-| `apps/web`     | TanStack Start + TanStack Form (React 19, Vite 8, Tailwind 4)                       | 3001     |
+| `apps/web`     | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                        | 3001     |
 | `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`)      | —        |
 | `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`          | —        |
 
@@ -68,8 +68,8 @@ shape for new features; if a new feature cannot follow it, say why before diverg
 | Service        | `apps/server/src/todos.ts`                      | `Context.Service` + `Layer`. Owns business rules and SQL; maps rows to domain types.        |
 | Handlers       | `apps/server/src/http/todos.ts`                 | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
 | Wiring         | `apps/server/src/index.ts`                      | Provides handler layers to the server.                                                      |
-| Client         | `apps/web/src/lib/api-client.ts`                | `HttpApiClient` over the shared `Api` + a `ManagedRuntime` bridge.                          |
-| UI             | `apps/web/src/routes/todos.tsx`                 | Route loader reads, TanStack Form submits, `router.invalidate()` refetches.                 |
+| Client         | `apps/web/src/lib/api-client.ts`                | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.                          |
+| UI             | `apps/web/src/routes/todos.tsx`                 | `useQuery` reads, TanStack Form submits, `invalidateQueries` refetches.                     |
 | Test           | `apps/server/test/todos.test.ts`                | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
 
 Rules the slice encodes:
@@ -121,35 +121,34 @@ This is why `apps/server/vitest.config.ts` uses `process.loadEnvFile` instead of
 
 Who owns what today — do not add a second owner for the same state:
 
-| State                 | Owner                                                     |
-| --------------------- | --------------------------------------------------------- |
-| Server data (reads)   | Route loader + `router.invalidate()` after every mutation |
-| Form state            | TanStack Form                                             |
-| Effect → React bridge | `runApi` in `apps/web/src/lib/api-client.ts`              |
+| State                 | Owner                                                                    |
+| --------------------- | ------------------------------------------------------------------------ |
+| Server data (reads)   | TanStack Query `useQuery` + `queryClient.invalidateQueries` on mutation   |
+| Form state            | TanStack Form                                                            |
+| Effect → React bridge | `eq` + `api` in `apps/web/src/lib/api-client.ts` (`effect-query`)         |
 
-No client state library is installed, and none is needed for request/response
-CRUD. `@effect-atom/atom-react` is the intended answer, but only once the web app
-has **push state a loader cannot model** — an Effect `Stream` rendered live, e.g.
-S3 upload or transcode progress. Then a stream-backed atom + `useAtomValue` beats
-hand-rolled `useState` + subscribe, and it coexists with loaders because it owns
-different state.
+`QueryClient` is created once at module scope in `__root.tsx`; every query-backed
+route sets `ssr: false` (the session cookie is browser-only), so there is no
+per-request cache. **Route loaders are not used for server data** — one owner only,
+and no loader serialization boundary to spread `Schema.Class` instances across.
 
-Do not reach for it to tidy `runApi`, to replace loaders, or to hold server data —
-that trades loader SSR for a second cache. Other signals worth naming when they
-arrive: per-mutation pending/error UI, and shared data invalidated across routes
-(`router.invalidate()` is all-or-nothing). If per-route repetition is the only
-pain, wrap the calls in a per-feature module (`lib/todos.ts`) — no new dependency.
+`effect-query` (`createEffectQueryFromManagedRuntime`) turns an Effect into
+`queryOptions`/`mutationOptions`; `api((client) => …)` supplies `ApiClient`.
+Failures stay typed: `error.match({ TodoNotFound: …, OrElse: … })`.
+
+`@effect-atom/atom-react` is still not installed and not needed — TanStack Query
+covers request/response. Reach for it only for **push state a query cannot model**:
+an Effect `Stream` rendered live (S3 upload or transcode progress).
 
 ### Web ↔ server gotchas
 
 Two things that are invisible until a real browser hits them, both already handled:
 
-- **Loader results must be plain values.** The router serializes them to the client and
-  throws on class instances — a `Schema.Class` instance, or Effect's `DateTime.Utc`.
-  Spread domain objects into plain ones in the loader, and prefer `Schema.DateFromString`
-  (a `Date`, which serializes natively) over `Schema.DateTimeUtc` on anything the web
-  reads. SSR hides this: it only fails once the list is non-empty.
-- **CORS is required for every mutation.** Loaders run server-side, but form submits run
+- **No loader carries server data.** The router serializes loader results and throws on
+  class instances (a `Schema.Class`, or `DateTime.Utc`), so reads go through `useQuery`
+  instead — nothing crosses that boundary. Still prefer `Schema.DateFromString` over
+  `Schema.DateTimeUtc` on anything the web reads.
+- **CORS is required for every request.** Queries and mutations both run
   in the browser against port 3000, so `apps/server/src/index.ts` applies
   `HttpMiddleware.cors`. The allow-list must include `traceparent` and `b3`, which
   Effect's `HttpClient` sends for tracing — omit them and the preflight fails.
@@ -221,7 +220,7 @@ Never downgrade a rule repo-wide to unblock one file. Code that legitimately run
 
 ## Optional Vendored Libraries
 
-Alchemy, effect-query, and effect-machine are vendored for reference but are NOT required. Never add them as dependencies or import them unless the task explicitly calls for it.
+Alchemy and effect-machine are vendored for reference but are NOT required. Never add them as dependencies or import them unless the task explicitly calls for it. `effect-query` IS a real dependency of `apps/web` (see Web state ownership); the vendored copy is its reference source.
 
 ## Alchemy — read as an Effect corpus, not a dependency
 
@@ -236,7 +235,7 @@ still the API source of truth; Alchemy shows how the pieces get put together.
 
 ## Effect Query
 
-When writing effect-query code, inspect `repos/effect-query/` for examples of idiomatic usage, tests, module structure, and API design. Treat it as the source of truth for effect-query patterns.
+`effect-query@1.0.0` is installed in `apps/web` — npm has no 1.0.4 despite the vendored tag, and 1.0.0 exports the same API. Its peer range asks for effect beta.104, but it only imports `Cause`/`Effect`/`Exit`/`Option`/`ManagedRuntime`, all present in beta.103. Inspect `repos/effect-query/` for idiomatic usage, tests, module structure, and API design.
 
 ## Effect Machine
 
@@ -261,7 +260,7 @@ Rules:
 
 - **Auth routes are not in `packages/api`.** Better Auth owns that contract and
   generates the client's types from the server instance. Everything else still
-  goes through `Api` + `runApi`.
+  goes through `Api` + `eq`/`api`.
 - **The raw route passes the web `Response` through untouched** — flattening its
   headers merges multiple `set-cookie` values into one broken cookie.
 - **CORS must set `credentials: true`.** The session cookie is cross-origin

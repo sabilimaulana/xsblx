@@ -1,4 +1,4 @@
-import type { Todo, TodoId } from "@xsblx/api/domain/todo";
+import type { TodoId } from "@xsblx/api/domain/todo";
 import { TodoCreateStandard } from "@xsblx/api/domain/todo";
 import { Button } from "@xsblx/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/card";
@@ -6,32 +6,65 @@ import { Checkbox } from "@xsblx/ui/components/checkbox";
 import { Field, FieldError } from "@xsblx/ui/components/field";
 import { Input } from "@xsblx/ui/components/input";
 import { useForm } from "@tanstack/react-form";
-import { Navigate, createFileRoute, useRouter } from "@tanstack/react-router";
-import { runApi } from "@/lib/api-client";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Navigate, createFileRoute } from "@tanstack/react-router";
+import { api, eq } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/todos")({
-  // The session cookie lives in the browser, so the loader has to run there: an
-  // SSR pass would call the API without credentials and get a 401.
+  // The session cookie lives in the browser, so the API can only be called from
+  // there: an SSR pass would call it without credentials and get a 401.
   ssr: false,
-  // Loader results are serialized to the browser, and the serializer only handles
-  // plain values — a `Schema.Class` instance throws. Spread domain objects into
-  // plain ones at this boundary; `Date` fields survive, `DateTime.Utc` would not.
-  loader: () =>
-    runApi((client) => client.todos.list()).then((todos) => todos.map((todo) => ({ ...todo }))),
   component: Todos,
 });
 
+const todosKey = ["todos"];
+
+const listTodos = eq.queryOptions({
+  queryKey: todosKey,
+  queryFn: () => api((client) => client.todos.list()),
+});
+
 function Todos() {
-  const todos = Route.useLoaderData();
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: todos } = useQuery(listTodos);
   // The session cookie only exists in the browser, so the gate is client-side.
-  // The API itself is still open — authorizing todos is a separate change.
+  // The API itself is closed too — handlers take the owner from the session.
   const { data: session, isPending } = useSession();
 
-  // Reloading the route after a mutation keeps the server as the single source
+  // Refetching the list after a mutation keeps the server as the single source
   // of truth. Swap for optimistic updates only when latency is a real problem.
-  const refresh = () => router.invalidate();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: todosKey });
+
+  const create = useMutation(
+    eq.mutationOptions({
+      mutationKey: ["todos", "create"],
+      mutationFn: (payload: { title: string }) => api((client) => client.todos.create({ payload })),
+      onSuccess: refresh,
+    }),
+  );
+
+  const update = useMutation(
+    eq.mutationOptions({
+      mutationKey: ["todos", "update"],
+      mutationFn: (variables: { id: TodoId; completed: boolean }) =>
+        api((client) =>
+          client.todos.update({
+            params: { id: variables.id },
+            payload: { completed: variables.completed },
+          }),
+        ),
+      onSuccess: refresh,
+    }),
+  );
+
+  const remove = useMutation(
+    eq.mutationOptions({
+      mutationKey: ["todos", "remove"],
+      mutationFn: (id: TodoId) => api((client) => client.todos.remove({ params: { id } })),
+      onSuccess: refresh,
+    }),
+  );
 
   const form = useForm({
     defaultValues: { title: "" },
@@ -39,23 +72,10 @@ function Todos() {
     // restated here — change `TodoCreate` and both sides follow.
     validators: { onSubmit: TodoCreateStandard },
     onSubmit: async ({ value, formApi }) => {
-      await runApi((client) => client.todos.create({ payload: value }));
+      await create.mutateAsync(value);
       formApi.reset();
-      await refresh();
     },
   });
-
-  const toggle = async (todo: Todo) => {
-    await runApi((client) =>
-      client.todos.update({ params: { id: todo.id }, payload: { completed: !todo.completed } }),
-    );
-    await refresh();
-  };
-
-  const remove = async (id: TodoId) => {
-    await runApi((client) => client.todos.remove({ params: { id } }));
-    await refresh();
-  };
 
   if (isPending) return null;
   if (!session) return <Navigate to="/signin" />;
@@ -105,13 +125,16 @@ function Todos() {
           </form>
 
           <ul className="flex flex-col gap-2">
-            {todos.map((todo) => (
+            {todos?.map((todo) => (
               <li key={todo.id} className="flex items-center gap-3">
-                <Checkbox checked={todo.completed} onCheckedChange={() => void toggle(todo)} />
+                <Checkbox
+                  checked={todo.completed}
+                  onCheckedChange={() => update.mutate({ id: todo.id, completed: !todo.completed })}
+                />
                 <span className={todo.completed ? "flex-1 line-through opacity-60" : "flex-1"}>
                   {todo.title}
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => void remove(todo.id)}>
+                <Button variant="ghost" size="sm" onClick={() => remove.mutate(todo.id)}>
                   Delete
                 </Button>
               </li>

@@ -1,5 +1,6 @@
 import { Api } from "@xsblx/api/api";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
+import { createEffectQueryFromManagedRuntime } from "effect-query";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 
@@ -30,11 +31,19 @@ export class ApiClient extends Context.Service<ApiClient, HttpApiClient.ForApi<t
 }
 
 /**
- * TanStack loaders and event handlers are plain async code, so a ManagedRuntime
- * is the bridge. Build it once at module scope, never per call.
+ * React is plain async code, so a ManagedRuntime is the bridge. Build it once at
+ * module scope, never per call.
  */
 const runtime = ManagedRuntime.make(ApiClient.layer);
 
-export const runApi = <A, E>(
+/**
+ * `eq.queryOptions` / `eq.mutationOptions` run an Effect inside TanStack Query
+ * with `ApiClient` already in context, and surface typed failures as
+ * `error.match({ ... })`.
+ */
+export const eq = createEffectQueryFromManagedRuntime(runtime);
+
+/** `api((client) => client.todos.list())` — the query/mutation fn body. */
+export const api = <A, E>(
   f: (client: ApiClient["Service"]) => Effect.Effect<A, E, never>,
-): Promise<A> => runtime.runPromise(Effect.flatMap(ApiClient, f));
+): Effect.Effect<A, E, ApiClient> => Effect.flatMap(ApiClient, f);

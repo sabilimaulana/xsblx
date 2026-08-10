@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
@@ -28,6 +29,10 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
+// Every query-backed route sets `ssr: false`, so the client is only ever used in
+// the browser — one module-scope instance is enough, no per-request cache.
+const queryClient = new QueryClient();
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -35,7 +40,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
         <TanStackDevtools
           config={{
             position: "bottom-right",
