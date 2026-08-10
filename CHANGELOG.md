@@ -9,6 +9,14 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Changed
+
+- **Validation failures read as human messages.** The credential and todo-title
+  schemas carry `message` annotations on their checks, so the sign-in/sign-up
+  and add-todo forms show "Enter a valid email address" or "Title is required"
+  instead of the generated filter text. Still one source of truth — the rules
+  live in `packages/api`, not in the components.
+
 ### Added
 
 - **Containers.** A root `Dockerfile` with `server` (195MB) and `web` (104MB)

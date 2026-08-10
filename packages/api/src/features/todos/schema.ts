@@ -3,9 +3,13 @@ import { Schema } from "effect";
 export const TodoId = Schema.Int.pipe(Schema.brand("TodoId"));
 export type TodoId = typeof TodoId.Type;
 
+// The message annotation is what a form renders on failure; without it the
+// default formatter falls back to the filter's `expected` text.
+const TodoTitle = Schema.String.check(Schema.isMinLength(1, { message: "Title is required" }));
+
 export class Todo extends Schema.Class<Todo>("Todo")({
   id: TodoId,
-  title: Schema.NonEmptyString,
+  title: TodoTitle,
   completed: Schema.Boolean,
   // ISO string on the wire, `Date` in TypeScript. Deliberately not `DateTimeUtc`:
   // loader results are serialized to the browser, and the router's serializer
@@ -14,7 +18,7 @@ export class Todo extends Schema.Class<Todo>("Todo")({
 }) {}
 
 export const TodoCreate = Schema.Struct({
-  title: Schema.NonEmptyString,
+  title: TodoTitle,
 });
 
 /**
@@ -25,6 +29,6 @@ export const TodoCreate = Schema.Struct({
 export const TodoCreateStandard = Schema.toStandardSchemaV1(TodoCreate);
 
 export const TodoUpdate = Schema.Struct({
-  title: Schema.optional(Schema.NonEmptyString),
+  title: Schema.optional(TodoTitle),
   completed: Schema.optional(Schema.Boolean),
 });
