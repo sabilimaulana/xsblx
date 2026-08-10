@@ -2,6 +2,7 @@ import { PgClient } from "@effect/sql-pg";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import { Context, Effect, Layer } from "effect";
 import { DatabaseConfig } from "../config.ts";
+import { relations } from "./relations.ts";
 
 /**
  * Drizzle running on Effect's own Postgres client, so queries are Effects with
@@ -9,9 +10,9 @@ import { DatabaseConfig } from "../config.ts";
  */
 export class Drizzle extends Context.Service<
   Drizzle,
-  Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults>>
+  Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults<typeof relations>>>
 >()("server/db/Drizzle") {
-  static readonly layer = Layer.effect(Drizzle, PgDrizzle.makeWithDefaults());
+  static readonly layer = Layer.effect(Drizzle, PgDrizzle.makeWithDefaults({ relations }));
 }
 
 export const PgLive = PgClient.layerConfig(DatabaseConfig);

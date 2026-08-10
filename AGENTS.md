@@ -234,14 +234,15 @@ When writing effect-machine code, inspect `repos/effect-machine/` for examples o
 Email + password only. Better Auth is a plain library that runs **outside** the
 Effect runtime; it is not wrapped in a service and does not follow the todos slice.
 
-| Layer   | File                                     | Responsibility                                                    |
-| ------- | ---------------------------------------- | ----------------------------------------------------------------- |
-| Config  | `apps/server/src/auth.ts`                | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
-| Schema  | `apps/server/src/db/auth-schema.ts`      | **Generated** — do not hand-edit. See regeneration below.         |
-| Mount   | `apps/server/src/http/auth.ts`           | Raw `HttpRouter` route at `/api/auth/*`.                          |
-| Shared  | `packages/api/src/domain/auth.ts`        | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).     |
-| Client  | `apps/web/src/lib/auth-client.ts`        | `createAuthClient` from `better-auth/react`.                      |
-| UI      | `apps/web/src/components/auth-form.tsx`  | One form, both modes. Routes `/signin`, `/signup`.                |
+| Layer  | File                                    | Responsibility                                                              |
+| ------ | --------------------------------------- | --------------------------------------------------------------------------- |
+| Config | `apps/server/src/auth.ts`               | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
+| Schema | `apps/server/src/db/schema.ts`          | Auth tables live beside `todos` in the one schema file. Regen below.        |
+| Relations | `apps/server/src/db/relations.ts`    | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
+| Mount  | `apps/server/src/http/auth.ts`          | Raw `HttpRouter` route at `/api/auth/*`.                                    |
+| Shared | `packages/api/src/domain/auth.ts`       | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
+| Client | `apps/web/src/lib/auth-client.ts`       | `createAuthClient` from `better-auth/react`.                                |
+| UI     | `apps/web/src/components/auth-form.tsx` | One form, both modes. Routes `/signin`, `/signup`.                          |
 
 Rules:
 
@@ -254,19 +255,22 @@ Rules:
   (web on 3001, API on 3000) and the client sends `credentials: "include"`.
 - **Credential rules live once** in `packages/api/src/domain/auth.ts`: the server
   passes `minPasswordLength`, the forms validate against the Standard Schemas.
-- **`auth.ts`, `db/auth-schema.ts` and `lib/auth-client.ts` are exempted** from
+- **`auth.ts`, `db/schema.ts` and `lib/auth-client.ts` are exempted** from
   `processEnv`/`globalDate`/`asyncFunction` in `tsconfig.effect.json` — they are
   the code that legitimately runs outside Effect.
 - The `/todos` gate is client-side (`useSession`). The API itself is still open;
   authorizing todos per user is a separate change.
 
-Regenerating the schema: the `auth` CLI runs under node/jiti and cannot import
+Regenerating the auth tables: the `auth` CLI runs under node/jiti and cannot import
 `drizzle-orm/bun-sql`, so point it at a throwaway config that uses
-`drizzleAdapter({} as never, { provider: "pg" })`, then delete the generated
-`relations(...)` block (drizzle 1.0-rc moved that API):
+`drizzleAdapter({} as never, { provider: "pg" })`, generate to a scratch file, then
+hand-merge the table definitions into `src/db/schema.ts`. Drop the generated
+`relations(...)` block — drizzle 1.0-rc moved that API and relations live in
+`src/db/relations.ts` via `defineRelations`.
 
 ```
-bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output src/db/auth-schema.ts -y
+bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
+# merge tables into src/db/schema.ts, then:
 bun run db:generate && bun run db:migrate
 ```
 
