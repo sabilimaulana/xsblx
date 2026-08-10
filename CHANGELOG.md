@@ -11,6 +11,8 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **`README.md`.** Stack, layout, setup, run and check commands, and where the
+  rules live for someone arriving at the repo cold.
 - **Documentation split.** `AGENTS.md` now carries only rules an agent can
   violate; `docs/technical/architecture.md` describes the system and its known
   ceilings, and `docs/technical/adr/` records the twelve decisions behind it.
