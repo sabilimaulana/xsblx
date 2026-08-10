@@ -1,4 +1,4 @@
-import { Api } from "@asshls/api/api";
+import { Api } from "@xsblx/api/api";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import { HttpMiddleware, HttpRouter } from "effect/unstable/http";

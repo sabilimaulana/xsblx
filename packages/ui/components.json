@@ -11,11 +11,11 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@asshls/ui/components",
-    "utils": "@asshls/ui/lib/utils",
-    "hooks": "@asshls/ui/hooks",
-    "lib": "@asshls/ui/lib",
-    "ui": "@asshls/ui/components"
+    "components": "@xsblx/ui/components",
+    "utils": "@xsblx/ui/lib/utils",
+    "hooks": "@xsblx/ui/hooks",
+    "lib": "@xsblx/ui/lib",
+    "ui": "@xsblx/ui/components"
   },
   "rtl": false,
   "menuColor": "default",

@@ -1,4 +1,4 @@
-import { Api } from "@asshls/api/api";
+import { Api } from "@xsblx/api/api";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";

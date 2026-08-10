@@ -1,5 +1,5 @@
 {
-  "$schema": "./node_modules/@effect/tsgo/schema.json",
+  "extends": "../../tsconfig.effect.json",
   "compilerOptions": {
     // Environment setup & latest features
     "lib": ["ESNext"],
@@ -26,70 +26,6 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false,
-    "plugins": [
-      {
-        "name": "@effect/language-service",
-        "diagnosticSeverity": {
-          // correctness — these are bugs
-          "floatingEffect": "error",
-          "missingEffectContext": "error",
-          "missingEffectError": "error",
-          "missingLayerContext": "error",
-          "missingStarInYieldEffectGen": "error",
-          "missingReturnYieldStar": "error",
-          "returnEffectInGen": "error",
-          "effectInVoidSuccess": "error",
-          "promiseInEffectSuccess": "error",
-          "outdatedApi": "error",
-          "classSelfMismatch": "error",
-          "effectFnImplicitAny": "error",
-          "anyUnknownInErrorContext": "error",
-          "unsafeEffectTypeAssertion": "error",
-          "duplicatePackage": "error",
-          // effect-native preset — repo policy is "Effect for everything effectful"
-          "abortControllerInEffect": "error",
-          "asyncFunction": "error",
-          "cryptoRandomUUID": "error",
-          "cryptoRandomUUIDInEffect": "error",
-          "extendsNativeError": "error",
-          "globalConsole": "error",
-          "globalConsoleInEffect": "error",
-          "globalDate": "error",
-          "globalDateInEffect": "error",
-          "globalFetch": "error",
-          "globalFetchInEffect": "error",
-          "globalRandom": "error",
-          "globalRandomInEffect": "error",
-          "globalTimers": "error",
-          "globalTimersInEffect": "error",
-          "instanceOfSchema": "error",
-          "newPromise": "error",
-          "nodeBuiltinImport": "error",
-          "preferSchemaOverJson": "error",
-          "processEnv": "error",
-          "processEnvInEffect": "error",
-          "tryCatchInEffectGen": "error",
-          // style — suggestions only, never block typecheck
-          "missedPipeableOpportunity": "off",
-          "unnecessaryArrowBlock": "off",
-          "effectFnOpportunity": "off",
-          "lazyEffect": "off",
-          "strictBooleanExpressions": "off"
-        },
-        "overrides": [
-          {
-            // config files run outside the Effect runtime
-            "include": ["drizzle.config.ts", "*.config.ts"],
-            "options": {
-              "diagnosticSeverity": {
-                "processEnv": "off",
-                "globalConsole": "off"
-              }
-            }
-          }
-        ]
-      }
-    ]
+    "noPropertyAccessFromIndexSignature": false
   }
 }

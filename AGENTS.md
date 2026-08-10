@@ -1,4 +1,4 @@
-# asshls
+# xsblx
 
 ## Workspace Layout
 
@@ -8,14 +8,14 @@ Bun workspace monorepo. TypeScript 7 everywhere. oxlint (`.oxlintrc.json`) + oxf
 | -------------- | ----------------------------------------------------------------------------------- | -------- |
 | `apps/server`  | Effect 4 (beta.103) + `@effect/platform-bun`, `HttpApi`, drizzle + `@effect/sql-pg` | 3000     |
 | `apps/web`     | TanStack Start + TanStack Form (React 19, Vite 8, Tailwind 4)                       | 3001     |
-| `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@asshls/api`)     | —        |
-| `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@asshls/ui`         | —        |
+| `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`)     | —        |
+| `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`         | —        |
 
 Scripts from the repo root: `bun run dev` (all), `dev:web`, `dev:server`, `build`, `typecheck`.
 
 ### Conventions
 
-- Workspace packages use the `@asshls/*` scope. Import UI as `@asshls/ui/components/<name>`, `@asshls/ui/lib/utils`, `@asshls/ui/globals.css`.
+- Workspace packages use the `@xsblx/*` scope. Import UI as `@xsblx/ui/components/<name>`, `@xsblx/ui/lib/utils`, `@xsblx/ui/globals.css`.
 - Inside `apps/web`, `@/*` maps to `apps/web/src/*`. It is the only in-app alias.
 - All Tailwind CSS lives in `packages/ui/src/styles/globals.css`; `apps/web` has no stylesheet of its own and imports that file in `__root.tsx`.
 - Add shadcn components into the UI package, not the app: `bunx shadcn@latest add <name> -c packages/ui`.
@@ -190,11 +190,12 @@ Inspect `repos/effect/` for examples of idiomatic usage, tests, module structure
 
 ### @effect/tsgo
 
-`apps/server` type-checks with `@effect/tsgo` — TypeScript 7 (`tsgo`) patched with the Effect language service. Already wired up; do not re-run `effect-tsgo setup`.
+Every workspace type-checks with `@effect/tsgo` — TypeScript 7 (`tsgo`) patched with the Effect language service. Already wired up; do not re-run `effect-tsgo setup`.
 
-- `bun run typecheck` in `apps/server` reports Effect diagnostics (e.g. `TS377001 floatingEffect`) alongside normal type errors. Treat them as errors, not lint noise.
-- The patch is applied by the `prepare` script (`effect-tsgo patch --typescript --no-oxlint`); it patches the hoisted `typescript` package at the repo root, so it affects every workspace's `tsc`. Re-run `bun install` if `tsc` stops emitting Effect diagnostics.
-- Plugin config lives in `apps/server/tsconfig.json` under `compilerOptions.plugins` → `@effect/language-service`.
+- `bun run typecheck` reports Effect diagnostics (e.g. `TS377001 floatingEffect`) alongside normal type errors. Treat them as errors, not lint noise.
+- `@effect/tsgo` is a **root** devDependency and the patch is applied by the root `prepare` script (`effect-tsgo patch --typescript --no-oxlint`); it patches the hoisted `typescript` package at the repo root, so it affects every workspace's `tsc`. Re-run `bun install` if `tsc` stops emitting Effect diagnostics.
+- Plugin config lives once in the root `tsconfig.effect.json`; `apps/server`, `apps/web` and `packages/api` `extends` it. Edit severities there, never per app — `extends` replaces the whole `plugins` array, so an app that restates it silently drops every shared rule.
+- Override `include` patterns in that file resolve relative to the **consuming** tsconfig's directory, not the root — keep them recursive (`**/*.config.ts`), not root-prefixed (`apps/web/**` matches nothing).
 - Bump `@effect/tsgo` when bumping `effect`.
 
 Rule severities:
@@ -203,7 +204,7 @@ Rule severities:
 - **default (`suggestion`)** — refactor hints like `effectMapVoid`, `flatMapToMap`, `multipleCatchTag`. They print but do not fail `typecheck`. Leave them unconfigured.
 - **`off`** — pure style: `missedPipeableOpportunity`, `unnecessaryArrowBlock`, `effectFnOpportunity`, `lazyEffect`, `strictBooleanExpressions`.
 
-Never downgrade a rule repo-wide to unblock one file. Code that legitimately runs outside the Effect runtime (config files, entry-point boot) gets a scoped entry in the plugin's `overrides` array — see the existing `*.config.ts` override.
+Never downgrade a rule repo-wide to unblock one file. Code that legitimately runs outside the Effect runtime gets a scoped entry in the plugin's `overrides` array in `tsconfig.effect.json`. Two exist: `**/*.config.ts` (config files, `processEnv`/`globalConsole` off) and `**/*.tsx` + `**/routes/**` (`asyncFunction`/`newPromise` off — React and TanStack loaders/`onSubmit` are async by API contract; Effect enters `apps/web` only through `runApi`).
 
 ## Optional Vendored Libraries
 

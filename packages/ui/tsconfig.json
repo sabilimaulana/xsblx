@@ -9,7 +9,7 @@
     "strict": true,
     "noEmit": true,
     "paths": {
-      "@asshls/ui/*": ["./src/*"]
+      "@xsblx/ui/*": ["./src/*"]
     }
   },
   "include": ["."],

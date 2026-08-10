@@ -10,18 +10,16 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "prepare": "effect-tsgo patch --typescript --no-oxlint"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@asshls/api": "workspace:*",
     "@effect/platform-bun": "catalog:effect",
     "@effect/sql-pg": "catalog:effect",
+    "@xsblx/api": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
     "effect": "catalog:effect"
   },
   "devDependencies": {
-    "@effect/tsgo": "0.36.0",
     "@effect/vitest": "catalog:effect",
     "@types/bun": "latest",
     "drizzle-kit": "1.0.0-rc.4",

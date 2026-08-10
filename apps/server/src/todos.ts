@@ -1,5 +1,5 @@
-import { Todo, TodoId } from "@asshls/api/domain/todo";
-import { TodoNotFound, TodosError } from "@asshls/api/domain/todo-errors";
+import { Todo, TodoId } from "@xsblx/api/domain/todo";
+import { TodoNotFound, TodosError } from "@xsblx/api/domain/todo-errors";
 import { eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "effect";
 import { Drizzle, DrizzleLive } from "./db/index.ts";

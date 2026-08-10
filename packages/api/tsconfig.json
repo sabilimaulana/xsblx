@@ -1,5 +1,5 @@
 {
-  "$schema": "../../apps/server/node_modules/@effect/tsgo/schema.json",
+  "extends": "../../tsconfig.effect.json",
   "compilerOptions": {
     "lib": ["ESNext"],
     "target": "ESNext",
@@ -12,8 +12,7 @@
     "strict": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "plugins": [{ "name": "@effect/language-service" }]
+    "noImplicitOverride": true
   },
   "include": ["src"]
 }

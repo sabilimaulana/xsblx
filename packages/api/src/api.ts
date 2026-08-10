@@ -5,4 +5,4 @@ import { TodosApiGroup } from "./groups/todos.ts";
 export class Api extends HttpApi.make("api")
   .add(HealthApiGroup)
   .add(TodosApiGroup)
-  .annotateMerge(OpenApi.annotations({ title: "asshls API" })) {}
+  .annotateMerge(OpenApi.annotations({ title: "xsblx API" })) {}

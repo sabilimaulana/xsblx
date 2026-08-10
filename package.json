@@ -1,5 +1,5 @@
 {
-  "name": "asshls",
+  "name": "xsblx",
   "private": true,
   "workspaces": {
     "packages": [
@@ -27,7 +27,7 @@
     }
   },
   "scripts": {
-    "prepare": "lefthook install",
+    "prepare": "lefthook install && effect-tsgo patch --typescript --no-oxlint",
     "dev": "bun run --filter '*' dev",
     "dev:web": "bun run --filter web dev",
     "dev:server": "bun run --filter server dev",
@@ -38,6 +38,7 @@
     "format:check": "oxfmt --check --disable-nested-config"
   },
   "devDependencies": {
+    "@effect/tsgo": "0.36.0",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",

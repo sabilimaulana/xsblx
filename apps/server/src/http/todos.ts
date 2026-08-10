@@ -1,5 +1,5 @@
-import { Api } from "@asshls/api/api";
-import type { TodosError } from "@asshls/api/domain/todo-errors";
+import { Api } from "@xsblx/api/api";
+import type { TodosError } from "@xsblx/api/domain/todo-errors";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Todos } from "../todos.ts";

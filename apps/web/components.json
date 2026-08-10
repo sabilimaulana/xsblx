@@ -14,8 +14,8 @@
     "components": "@/components",
     "hooks": "@/hooks",
     "lib": "@/lib",
-    "utils": "@asshls/ui/lib/utils",
-    "ui": "@asshls/ui/components"
+    "utils": "@xsblx/ui/lib/utils",
+    "ui": "@xsblx/ui/components"
   },
   "rtl": false,
   "menuColor": "default",
