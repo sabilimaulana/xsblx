@@ -1,8 +1,8 @@
 import { assert, layer } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Metric } from "effect";
 import { Drizzle, DrizzleLive } from "../../db/index.ts";
 import { user } from "../auth/schema.ts";
-import { Todos } from "./service.ts";
+import { Todos, todosCreated } from "./service.ts";
 
 const OWNER = "test-user-owner";
 const OTHER = "test-user-other";
@@ -71,6 +71,38 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
       assert.strictEqual(deleted.reason._tag, "TodoNotFound");
 
       assert.isEmpty(yield* todos.list(OTHER));
+    }),
+  );
+
+  /**
+   * The counter is read in-process rather than through an exporter: the metric
+   * registry is global and survives the truncate between tests, so the assertion
+   * is on the delta, never the absolute count.
+   */
+  it.effect("counts successful creations", () =>
+    Effect.gen(function* () {
+      yield* seedUsers;
+      const todos = yield* Todos;
+
+      const before = yield* Metric.value(todosCreated);
+      yield* todos.create(OWNER, { title: "counted" });
+      const after = yield* Metric.value(todosCreated);
+
+      assert.strictEqual(after.count, before.count + 1);
+    }),
+  );
+
+  it.effect("does not count a failed creation", () =>
+    Effect.gen(function* () {
+      const todos = yield* Todos;
+
+      const before = yield* Metric.value(todosCreated);
+      // No seeded users, so the owner foreign key rejects the insert. The
+      // service dies rather than failing, hence `Effect.exit` on the defect.
+      yield* todos.create("nobody", { title: "orphan" }).pipe(Effect.exit);
+      const after = yield* Metric.value(todosCreated);
+
+      assert.strictEqual(after.count, before.count);
     }),
   );
 

@@ -28,7 +28,7 @@ const toDomain = (row: TodoRow): Todo =>
  * Nothing exports metrics unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set; declaring
  * one is cheap and never fails.
  */
-const todosCreated = Metric.counter("todos_created_total", {
+export const todosCreated = Metric.counter("todos_created_total", {
   description: "Todos successfully inserted.",
   incremental: true,
 });

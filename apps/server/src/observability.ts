@@ -26,7 +26,14 @@ export const ObservabilityLive = Layer.unwrap(
       onNone: () => NodeSdk.layerEmpty,
       onSome: (endpoint) =>
         NodeSdk.layer(() => ({
-          resource: { serviceName: config.serviceName },
+          resource: {
+            serviceName: config.serviceName,
+            // Every worker exports its own metrics. Without something to tell
+            // the processes apart their series carry identical labels and
+            // overwrite each other in the backend — four workers then report
+            // one worker's counts. `WORKERS=1` makes this a constant.
+            attributes: { "service.instance.id": String(process.pid) },
+          },
           // Batched, not simple: a span export per request would put an HTTP
           // round-trip on the hot path of every request it is measuring.
           spanProcessor: new BatchSpanProcessor(

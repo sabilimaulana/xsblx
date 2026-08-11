@@ -11,6 +11,9 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **`docker compose --profile otel up -d` runs a local telemetry backend.**
+  `grafana/otel-lgtm` takes traces, metrics and logs on one OTLP endpoint
+  (`:4318`); Grafana reads them on `:3002`.
 - **The server exports metrics over OTLP**, on a 60s interval and on shutdown:
   Effect's fiber runtime gauges plus `todos_created_total`. Same endpoint as
   traces; nothing is exported when it is unset.

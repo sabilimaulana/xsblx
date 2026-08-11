@@ -83,8 +83,14 @@ because the barrel re-exports `WebSdk`. Server code imports
 One endpoint carries both signals, comes from config and defaults to unset. With
 no endpoint neither the span processor nor the metric reader is installed, and
 the process runs with no backend and no network calls — cloning this repo into a
-real project means setting one environment variable. Jaeger runs as a compose profile for local use, per
-ADR 0014's rule that a new service is a profile and not a second compose file.
+real project means setting one environment variable.
+
+The local backend is `grafana/otel-lgtm` in a compose profile, per ADR 0014's
+rule that a new service is a profile and not a second compose file. One
+container, one OTLP endpoint, all three signals. Jaeger was the first choice and
+was wrong: it is traces-only and answers `404 page not found` on `/v1/metrics`.
+The OTel SDK swallows that failure — exporter errors go to `diag`, which is off
+by default, so a misdirected metric pipeline looks exactly like a working one.
 
 Observability is infrastructure, not a feature slice. The layer is built in
 `apps/server/src/observability.ts` — a sibling of `config.ts` and `migrate.ts` —
@@ -139,6 +145,10 @@ The three signals carry different weight:
 - Metrics resolve at 60s and the reader takes no environment variable, so a
   faster interval is a code change. Shutdown force-flushes, so a short-lived
   process still reports.
+- Every worker exports its own metrics, so a query without `sum()` reads one
+  process. `service.instance.id` carries the pid to keep the series apart;
+  dropping it makes four workers silently report one worker's counts. Traces are
+  unaffected — spans are independent.
 - Reversing the export is cheap — delete `observability.ts`, its line in
   `index.ts`, the config entries and eleven dependencies. Reversing the
   instrumentation is not: the `Effect.fn` span names are spread across every

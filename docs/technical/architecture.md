@@ -140,11 +140,14 @@ no network calls — which is how the repo runs out of the box.
 | `LOG_LEVEL`                   | `Info`                 |
 | `LOG_FORMAT`                  | by `NODE_ENV`          |
 
-A local backend is a compose profile, per ADR 0014:
+A local backend is a compose profile, per ADR 0014. It runs Prometheus, Tempo,
+Loki and Grafana in one container, so a single endpoint takes all three signals —
+a traces-only backend silently 404s the metrics:
 
 ```
-docker compose --profile otel up -d   # Jaeger: OTLP on :4318, UI on :16686
+docker compose --profile otel up -d   # otel-lgtm: OTLP on :4318, Grafana on :3002
 # then set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+#                          (http://otel:4318 from inside another container)
 ```
 
 Two gotchas that cost real time, both recorded in ADR 0015: import
@@ -233,9 +236,16 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **Auth routes produce no spans.** Better Auth runs outside the Effect runtime
   (ADR 0007), so `/api/auth/*` is invisible in a trace — including the
   per-request auth CPU that bounds the throughput measured above.
-- **No HTTP request metrics.** Effect's server emits none and `HttpMiddleware` has
-  no metrics member, so request rate and latency are derived from span data.
-  Cheap aggregates without sampling traces would need custom middleware.
+- **Metrics are per-process, so always aggregate.** Each worker exports its own
+  series, told apart by `service.instance.id` (the pid). A bare
+  `todos_created_total` reads one worker's count; `sum(todos_created_total)` is
+  the real number. Without that attribute the series carry identical labels and
+  silently overwrite each other.
+- **No HTTP request metrics from the app.** Effect's server emits none and
+  `HttpMiddleware` has no metrics member. The local backend derives
+  `traces_spanmetrics_*` from span data instead, which covers request rate and
+  latency without custom middleware — but that is the backend's doing, not the
+  server's, and a different backend may not.
 - **Metrics resolve at 60s** and the reader reads no environment variable, so a
   finer interval is a code change in `observability.ts`.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
