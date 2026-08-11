@@ -1,4 +1,4 @@
-import type { TodoId } from "@xsblx/api/todos/schema";
+import type { TodoId, TodoStatus } from "@xsblx/api/todos/schema";
 import { TodoCreateStandard } from "@xsblx/api/todos/schema";
 import { Button } from "@xsblx/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/card";
@@ -6,8 +6,9 @@ import { Checkbox } from "@xsblx/ui/components/checkbox";
 import { Field, FieldError } from "@xsblx/ui/components/field";
 import { Input } from "@xsblx/ui/components/input";
 import { useForm } from "@tanstack/react-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { api, eq } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 
@@ -15,14 +16,37 @@ export const Route = createFileRoute("/_protected/todos")({ component: Todos });
 
 const todosKey = ["todos"];
 
-const listTodos = eq.queryOptions({
-  queryKey: todosKey,
-  queryFn: () => api((client) => client.todos.list()),
-});
+const PAGE_SIZE = 20;
+
+const STATUSES = ["all", "open", "done"] as const satisfies ReadonlyArray<TodoStatus>;
+
+/**
+ * The list is cursor-paginated, so the client follows `nextCursor` and never
+ * computes an offset. The status is part of the query key — a different filter
+ * is a different list, not a refetch of the same one.
+ */
+const listTodos = (status: TodoStatus) =>
+  eq.infiniteQueryOptions({
+    queryKey: [...todosKey, status],
+    queryFn: ({ pageParam }) =>
+      api((client) =>
+        client.todos.list({
+          query: { status, limit: PAGE_SIZE, cursor: pageParam ?? undefined },
+        }),
+      ),
+    initialPageParam: null as TodoId | null,
+    // `null` from the server means the last page; TanStack reads that as "no
+    // next page" and disables `fetchNextPage`.
+    getNextPageParam: (page) => page.nextCursor,
+  });
 
 function Todos() {
   const queryClient = useQueryClient();
-  const { data: todos } = useQuery(listTodos);
+  const [status, setStatus] = useState<TodoStatus>("all");
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(
+    listTodos(status),
+  );
+  const todos = data?.pages.flatMap((page) => page.items);
   // `_protected` already guarantees a session before this renders.
   const { data: session } = useSession();
 
@@ -115,6 +139,19 @@ function Todos() {
             </form.Field>
           </form>
 
+          <div className="flex gap-1">
+            {STATUSES.map((option) => (
+              <Button
+                key={option}
+                variant={option === status ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setStatus(option)}
+              >
+                {option}
+              </Button>
+            ))}
+          </div>
+
           <ul className="flex flex-col gap-2">
             {todos?.map((todo) => (
               <li key={todo.id} className="flex items-center gap-3">
@@ -131,6 +168,16 @@ function Todos() {
               </li>
             ))}
           </ul>
+
+          {hasNextPage ? (
+            <Button
+              variant="outline"
+              onClick={() => void fetchNextPage()}
+              disabled={isFetchingNextPage}
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more"}
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </div>

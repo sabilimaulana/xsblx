@@ -1,6 +1,7 @@
-import { Todo, TodoId } from "@xsblx/api/todos/schema";
+import type { TodoStatus } from "@xsblx/api/todos/schema";
+import { Todo, TodoId, TodoPage } from "@xsblx/api/todos/schema";
 import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { Context, Effect, Layer, Metric } from "effect";
 import { Drizzle, DrizzleLive } from "../../db/index.ts";
 import { todos } from "./schema.ts";
@@ -36,6 +37,12 @@ export const todosCreated = Metric.counter("todos_created_total", {
 /** A row only exists for its owner — the id alone is never enough to reach it. */
 const owned = (userId: string, id: TodoId) => and(eq(todos.id, id), eq(todos.userId, userId));
 
+export type TodoListOptions = {
+  readonly status: TodoStatus;
+  readonly limit: number;
+  readonly cursor?: TodoId | undefined;
+};
+
 /**
  * Every method takes the owner's id and every query filters on it. A todo belonging
  * to another user is indistinguishable from one that does not exist — `TodoNotFound`
@@ -44,7 +51,7 @@ const owned = (userId: string, id: TodoId) => and(eq(todos.id, id), eq(todos.use
 export class Todos extends Context.Service<
   Todos,
   {
-    list(userId: string): Effect.Effect<Array<Todo>, TodosError>;
+    list(userId: string, page: TodoListOptions): Effect.Effect<TodoPage, TodosError>;
     getById(userId: string, id: TodoId): Effect.Effect<Todo, TodosError>;
     create(userId: string, input: { readonly title: string }): Effect.Effect<Todo, TodosError>;
     update(
@@ -60,13 +67,37 @@ export class Todos extends Context.Service<
     Effect.gen(function* () {
       const db = yield* Drizzle;
 
-      const list = Effect.fn("Todos.list")(function* (userId: string) {
+      /**
+       * Keyset pagination: the cursor is the last id of the previous page and
+       * ordering is by id descending, which the `todos_userId_id_idx` index
+       * serves directly. `OFFSET` is not used — it re-scans every skipped row,
+       * so page 500 costs 500 pages of work and shifts under concurrent inserts.
+       *
+       * One row beyond `limit` is fetched to learn whether another page exists
+       * without a second `COUNT` query.
+       */
+      const list = Effect.fn("Todos.list")(function* (userId: string, page: TodoListOptions) {
+        yield* Effect.annotateCurrentSpan({ status: page.status, limit: page.limit });
         const rows = yield* db
           .select()
           .from(todos)
-          .where(eq(todos.userId, userId))
+          .where(
+            and(
+              eq(todos.userId, userId),
+              page.cursor === undefined ? undefined : lt(todos.id, page.cursor),
+              page.status === "all" ? undefined : eq(todos.completed, page.status === "done"),
+            ),
+          )
+          .orderBy(desc(todos.id))
+          .limit(page.limit + 1)
           .pipe(Effect.orDie);
-        return rows.map(toDomain);
+
+        const hasMore = rows.length > page.limit;
+        const items = (hasMore ? rows.slice(0, page.limit) : rows).map(toDomain);
+        return new TodoPage({
+          items,
+          nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+        });
       });
 
       const getById = Effect.fn("Todos.getById")(function* (userId: string, id: TodoId) {

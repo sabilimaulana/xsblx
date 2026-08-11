@@ -1,6 +1,6 @@
 ---
 status: active
-version: 1.1.0
+version: 1.2.0
 updated: 2026-08-11
 ---
 
@@ -60,8 +60,9 @@ the layer is the filename (ADR 0005).
 | Handlers       | `apps/server/src/features/todos/http.ts`         | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
 | Wiring         | `apps/server/src/index.ts`                       | Provides handler layers to the server.                                                      |
 | Client         | `apps/web/src/lib/api-client.ts`                 | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.   |
-| UI             | `apps/web/src/routes/todos.tsx`                  | `useQuery` reads, TanStack Form submits, `invalidateQueries` refetches.                     |
+| UI             | `apps/web/src/routes/_protected/todos.tsx`       | `useInfiniteQuery` pages, TanStack Form submits, `invalidateQueries` refetches.             |
 | Test           | `apps/server/src/features/todos/service.test.ts` | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
+| Contract test  | `apps/server/src/features/todos/http.test.ts`    | Decodes the endpoint's built query schema — defaults, bounds, string parsing. No database.  |
 
 Central by necessity, not feature-folded:
 
@@ -69,6 +70,12 @@ Central by necessity, not feature-folded:
   `features/*/schema.ts`. drizzle-kit takes one schema entry, and
   `defineRelations` in `db/relations.ts` needs all tables at once.
 - `packages/api/src/api.ts` — composes the groups. Only job.
+
+`GET /todos` is the worked example of a **paginated, filtered read** (ADR 0016):
+query params are a field record on the endpoint, defaults and the page cap live
+in the schema, the service seeks by keyset on `(userId, id DESC)` and returns
+`TodoPage { items, nextCursor }`, and the UI pages with
+`eq.infiniteQueryOptions`. Copy that shape for any list endpoint.
 
 Tests live beside the code they test (`src/**/*.test.ts`). No `test/` directory.
 
@@ -197,8 +204,11 @@ files at pre-commit; hooks install via the root `prepare` script.
 
 ## Known ceilings
 
-- **No pagination on list endpoints.** `Todos` list returns every row for the
-  user. Fine at current scale; a per-user cap plus cursor pagination is the fix.
+- **List pages cannot be jumped to, and carry no total.** Lists are keyset
+  paginated (ADR 0016), so a client follows `nextCursor` and there is no page
+  number and no count. Adding either costs a `COUNT(*)` per request.
+- **List ordering is welded to `id` descending.** Sorting by any other column
+  needs a composite cursor and a matching index (ADR 0016).
 - **Authenticated throughput is bounded by per-request auth CPU, not by Postgres
   and not by the HTTP layer.** `autocannon` against the container image, authed
   `GET /todos`, session cookie cache warm:

@@ -34,6 +34,7 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0013 | [Nitro serves the web production build](./0013-nitro-serves-the-web-build.md)                              | accepted |
 | 0014 | [One Dockerfile, one compose file](./0014-one-dockerfile-one-compose-file.md)                              | accepted |
 | 0015 | [Effect-native observability over OTLP](./0015-effect-native-observability-over-otlp.md)                   | accepted |
+| 0016 | [Keyset pagination on list endpoints](./0016-keyset-pagination-on-list-endpoints.md)                       | accepted |
 
 Template:
 

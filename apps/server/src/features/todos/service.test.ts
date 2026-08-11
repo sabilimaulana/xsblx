@@ -2,10 +2,14 @@ import { assert, layer } from "@effect/vitest";
 import { Effect, Layer, Metric } from "effect";
 import { Drizzle, DrizzleLive } from "../../db/index.ts";
 import { user } from "../auth/schema.ts";
+import type { TodoListOptions } from "./service.ts";
 import { Todos, todosCreated } from "./service.ts";
 
 const OWNER = "test-user-owner";
 const OTHER = "test-user-other";
+
+/** What the query schema's defaults decode to, for tests that do not page. */
+const ALL: TodoListOptions = { status: "all", limit: 20 };
 
 /**
  * Todos are owned, so the owners have to exist before anything can be created.
@@ -39,11 +43,12 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
       const completed = yield* todos.update(OWNER, created.id, { completed: true });
       assert.strictEqual(completed.completed, true);
 
-      const listed = yield* todos.list(OWNER);
+      const listed = yield* todos.list(OWNER, ALL);
       assert.deepStrictEqual(
-        listed.map((todo) => todo.id),
+        listed.items.map((todo) => todo.id),
         [created.id],
       );
+      assert.strictEqual(listed.nextCursor, null);
 
       yield* todos.remove(OWNER, created.id);
 
@@ -70,7 +75,74 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
       const deleted = yield* todos.remove(OTHER, created.id).pipe(Effect.flip);
       assert.strictEqual(deleted.reason._tag, "TodoNotFound");
 
-      assert.isEmpty(yield* todos.list(OTHER));
+      assert.isEmpty((yield* todos.list(OTHER, ALL)).items);
+    }),
+  );
+
+  it.effect("pages newest-first by following nextCursor", () =>
+    Effect.gen(function* () {
+      yield* seedUsers;
+      const todos = yield* Todos;
+
+      // Created oldest to newest; the list is newest-first, so this reverses.
+      const created = yield* Effect.forEach(
+        [1, 2, 3, 4, 5],
+        (n) => todos.create(OWNER, { title: `todo ${n}` }),
+        { concurrency: 1 },
+      );
+      const newestFirst = created.map((todo) => todo.id).toReversed();
+
+      const first = yield* todos.list(OWNER, { status: "all", limit: 2 });
+      assert.deepStrictEqual(
+        first.items.map((todo) => todo.id),
+        newestFirst.slice(0, 2),
+      );
+      assert.strictEqual(first.nextCursor, newestFirst[1]);
+
+      const second = yield* todos.list(OWNER, {
+        status: "all",
+        limit: 2,
+        cursor: first.nextCursor ?? undefined,
+      });
+      assert.deepStrictEqual(
+        second.items.map((todo) => todo.id),
+        newestFirst.slice(2, 4),
+      );
+
+      // The final page is short of `limit`, so there is no cursor to follow.
+      const third = yield* todos.list(OWNER, {
+        status: "all",
+        limit: 2,
+        cursor: second.nextCursor ?? undefined,
+      });
+      assert.deepStrictEqual(
+        third.items.map((todo) => todo.id),
+        newestFirst.slice(4),
+      );
+      assert.strictEqual(third.nextCursor, null);
+    }),
+  );
+
+  it.effect("filters by status", () =>
+    Effect.gen(function* () {
+      yield* seedUsers;
+      const todos = yield* Todos;
+
+      const open = yield* todos.create(OWNER, { title: "open" });
+      const done = yield* todos.create(OWNER, { title: "done" });
+      yield* todos.update(OWNER, done.id, { completed: true });
+
+      const onlyOpen = yield* todos.list(OWNER, { status: "open", limit: 20 });
+      assert.deepStrictEqual(
+        onlyOpen.items.map((todo) => todo.id),
+        [open.id],
+      );
+
+      const onlyDone = yield* todos.list(OWNER, { status: "done", limit: 20 });
+      assert.deepStrictEqual(
+        onlyDone.items.map((todo) => todo.id),
+        [done.id],
+      );
     }),
   );
 

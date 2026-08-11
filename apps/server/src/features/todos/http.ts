@@ -20,7 +20,11 @@ export const TodosApiHandlers = HttpApiBuilder.group(
 
     return (
       handlers
-        .handle("list", () => Effect.flatMap(userId, todos.list).pipe(Effect.orDie))
+        // The query schema already applied its defaults and bounds, so the
+        // handler passes it straight through — no shape of its own.
+        .handle("list", ({ query }) =>
+          Effect.flatMap(userId, (id) => todos.list(id, query)).pipe(Effect.orDie),
+        )
         // `TodoNotFound` is the only reason the API models; anything else is a bug
         // and becomes a 500.
         .handle("getById", ({ params }) =>

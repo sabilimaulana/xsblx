@@ -98,6 +98,10 @@ Effect owns all three signals; never add another library for them (ADR 0015).
 - **Services return domain errors only** (ADR 0003). Infrastructure failures are
   `Effect.orDie` — they are bugs, not outcomes. One wrapper error per domain.
 - **Row types never escape the service.** `toDomain` converts at the boundary.
+- **A list endpoint is keyset-paginated or it is wrong** (ADR 0016). Query params
+  are a field record on the endpoint, the default and the cap live in that
+  schema, the response is `{ items, nextCursor }`, and the index covers
+  `(owner, sortColumn)`. No `OFFSET`, no unbounded `select()`.
 - **Handlers hold no business rules.** They map service error reasons onto the
   endpoint's declared errors; an unexpected reason is `Effect.die`.
 - **Tests hit real Postgres** (ADR 0004), and live beside the code they test

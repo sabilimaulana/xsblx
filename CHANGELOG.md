@@ -11,6 +11,15 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **`GET /todos` takes `status`, `limit` and `cursor` query params.** `status` is
+  `all` (default), `open` or `done`; `limit` defaults to 20 and is capped at 100;
+  `cursor` is the id of the last todo on the previous page. The response is now
+  `{ items, nextCursor }`, with `nextCursor: null` on the last page. The todos
+  page pages with a "Load more" button and filters by status. See
+  [ADR 0016](docs/technical/adr/0016-keyset-pagination-on-list-endpoints.md).
+- **`apps/server/src/features/todos/http.test.ts`** asserts the list endpoint's
+  query contract — defaults, bounds, string parsing. No database.
+
 - **`docker compose --profile otel up -d` runs a local telemetry backend.**
   `grafana/otel-lgtm` takes traces, metrics and logs on one OTLP endpoint
   (`:4318`); Grafana reads them on `:3002`.
@@ -28,6 +37,11 @@ in an ADR, not here — link it.
   `architecture.md` for the measured worker/throughput curve.
 
 ### Changed
+
+- **The `todos` index is `(userId, id DESC)`**, replacing `todos_userId_idx`. It
+  serves the keyset seek and the ordering in one access path. Run `db:migrate`.
+- **`Todos.list` takes a page and returns a `TodoPage`.** Callers pass
+  `{ status, limit, cursor? }` and read `.items`.
 
 - **Sessions are cached in a signed cookie for 60s**, so an authenticated request
   no longer costs a database lookup. Revoking a session now takes effect after up
