@@ -1,7 +1,7 @@
 ---
 status: active
-version: 1.0.0
-updated: 2026-08-10
+version: 1.1.0
+updated: 2026-08-11
 ---
 
 # Architecture
@@ -32,7 +32,7 @@ workspace — `catalog:` for the common set (typescript, vite, react, tailwindcs
 Env vars are per app (`apps/server/.env`, template `apps/server/.env.example`),
 because Bun loads the `.env` in the cwd. There is no repo-root `.env`.
 `apps/server` needs `DATABASE_URL`, `AUTH_URL`, `AUTH_SECRET`,
-`CORS_ALLOWED_ORIGINS`.
+`CORS_ALLOWED_ORIGINS`. Observability variables are optional — see below.
 
 ## Import paths
 
@@ -106,6 +106,51 @@ bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output /tmp/auth-schema
 # merge tables into src/features/auth/schema.ts, then:
 bun run db:generate && bun run db:migrate
 ```
+
+## Observability
+
+All three signals come from Effect itself and leave over OTLP/HTTP (ADR 0015).
+Infrastructure, not a slice — there is no `features/observability/`.
+
+| Piece         | File                                        | Responsibility                                                                     |
+| ------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Config        | `apps/server/src/config.ts`                 | `ObservabilityConfig` — endpoint, service name, log level, log format.             |
+| Layer         | `apps/server/src/observability.ts`          | Logger, minimum level, OTLP span processor and metric reader.                      |
+| Wiring        | `apps/server/src/index.ts`                  | `Layer.provide(ObservabilityLive)` beneath the server layer.                       |
+| Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` spans; `todos_created_total` counter. The copyable pattern. |
+
+What each signal is:
+
+- **Logs.** `Logger.consoleJson` or `Logger.consolePretty()` by `LOG_FORMAT`,
+  threshold from `LOG_LEVEL`. Written to stdout for a collector to pick up — logs
+  are not pushed over OTLP.
+- **Traces.** `http.span` per request from `HttpApi`, one span per service method
+  from `Effect.fn`. Batched to `${endpoint}/v1/traces`.
+- **Metrics.** Effect's fiber runtime gauges plus declared `Metric`s, pushed to
+  `${endpoint}/v1/metrics` every 60s and on shutdown.
+
+Everything is gated on one variable. With `OTEL_EXPORTER_OTLP_ENDPOINT` unset the
+span processor and metric reader are not installed at all, and the process makes
+no network calls — which is how the repo runs out of the box.
+
+| Variable                      | Default                |
+| ----------------------------- | ---------------------- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset — export nothing |
+| `OTEL_SERVICE_NAME`           | `xsblx-server`         |
+| `LOG_LEVEL`                   | `Info`                 |
+| `LOG_FORMAT`                  | by `NODE_ENV`          |
+
+A local backend is a compose profile, per ADR 0014:
+
+```
+docker compose --profile otel up -d   # Jaeger: OTLP on :4318, UI on :16686
+# then set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+Two gotchas that cost real time, both recorded in ADR 0015: import
+`@effect/opentelemetry` **by subpath** (the package root re-exports `WebSdk` and
+fails at startup), and keep the SDK layer out of `Layer.mergeAll` (parallel
+construction leaves its own `Resource` unsatisfied — use `Layer.provideMerge`).
 
 ## Type-checking: `@effect/tsgo`
 
@@ -185,6 +230,14 @@ files at pre-commit; hooks install via the root `prepare` script.
   reimplements a Better Auth format ADR 0007 deliberately avoids, so it needs its
   own ADR — and a second datastore for sessions is not the answer.
 
+- **Auth routes produce no spans.** Better Auth runs outside the Effect runtime
+  (ADR 0007), so `/api/auth/*` is invisible in a trace — including the
+  per-request auth CPU that bounds the throughput measured above.
+- **No HTTP request metrics.** Effect's server emits none and `HttpMiddleware` has
+  no metrics member, so request rate and latency are derived from span data.
+  Cheap aggregates without sampling traces would need custom middleware.
+- **Metrics resolve at 60s** and the reader reads no environment variable, so a
+  finer interval is a code change in `observability.ts`.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.
