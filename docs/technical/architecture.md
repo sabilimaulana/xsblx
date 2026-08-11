@@ -151,6 +151,21 @@ files at pre-commit; hooks install via the root `prepare` script.
 
 - **No pagination on list endpoints.** `Todos` list returns every row for the
   user. Fine at current scale; a per-user cap plus cursor pagination is the fix.
+- **~5k req/s on any authenticated route, set by session lookup — not by the
+  HTTP layer.** Measured locally with `autocannon` against `bun src/index.ts`:
+  `/health` sustains 44.5k req/s (p50 1ms, p99 2ms), so Bun's server plus the
+  Effect router and schema encode are not the constraint. `/api/auth/get-session`
+  alone drops that to 5.4k (p50 9ms), and `/todos` — auth plus the query — to
+  5.0k, meaning the todos query costs ~8% and Better Auth's per-request DB
+  round-trip costs the other 89%. The ceiling is a queue, not a starved pool:
+  throughput is flat from 10 to 200 concurrent connections while latency grows
+  linearly (1ms → 41ms p50) with 17 Postgres backends open. Because auth runs
+  outside the Effect runtime (ADR 0007), this tax is fixed per request and
+  independent of what the endpoint does — a route that touches nothing pays the
+  same 9ms as one that reads everything. The fix, when traffic justifies it, is
+  Better Auth's cookie cache (signed session in the cookie, no DB hit), which is
+  a config change inside `features/auth/auth.ts` rather than an architectural
+  one. Do not reach for a second datastore for sessions before trying it.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.
