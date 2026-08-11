@@ -33,6 +33,7 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0012 | [Vendored repos are reference, not dependencies](./0012-vendored-repos-as-reference-not-dependencies.md)   | accepted |
 | 0013 | [Nitro serves the web production build](./0013-nitro-serves-the-web-build.md)                              | accepted |
 | 0014 | [One Dockerfile, one compose file](./0014-one-dockerfile-one-compose-file.md)                              | accepted |
+| 0015 | [Effect-native observability over OTLP](./0015-effect-native-observability-over-otlp.md)                   | accepted |
 
 Template:
 

@@ -56,6 +56,20 @@ another library for anything Effect already provides.
 - Bump versions through the root `package.json` catalogs, never in a single
   workspace.
 
+### Observability
+
+Effect owns all three signals; never add another library for them (ADR 0015).
+
+- **A service method is declared with `Effect.fn("Todos.list")`, not a bare
+  generator.** The name is the span name — `Feature.method`. Dropping it makes
+  the feature invisible in a trace.
+- **Log through `Effect.log*`.** Never `console.log`: it bypasses the configured
+  logger, the level filter and the span context.
+- **Import `@effect/opentelemetry` by subpath** (`/NodeSdk`). The package root
+  re-exports `WebSdk` and crashes the server at startup.
+- Exporter wiring lives in `apps/server/src/observability.ts`. It is
+  infrastructure — it never becomes a feature slice.
+
 ### @effect/tsgo
 
 - `bun run typecheck` emits Effect diagnostics (e.g. `TS377001 floatingEffect`).

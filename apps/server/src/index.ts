@@ -9,6 +9,7 @@ import { AuthRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
 import { HealthHandlers } from "./features/health/http.ts";
 import { TodosApiHandlers } from "./features/todos/http.ts";
+import { ObservabilityLive } from "./observability.ts";
 
 const ApiRoutes = Layer.mergeAll(
   HttpApiBuilder.layer(Api, {
@@ -35,7 +36,12 @@ const HttpServerLayer = Layer.unwrap(
       }),
     }),
   ),
-).pipe(Layer.provide(BunHttpServer.layerConfig(ServerConfig)));
+).pipe(
+  Layer.provide(BunHttpServer.layerConfig(ServerConfig)),
+  // Provided beneath the server so every layer and handler below it logs through
+  // the configured logger and reports spans to the configured exporter.
+  Layer.provide(ObservabilityLive),
+);
 
 // The primary only supervises: `cluster` restarts a worker that dies, and every
 // worker runs the same `Bun.serve` on the shared port. With WORKERS=1 (the

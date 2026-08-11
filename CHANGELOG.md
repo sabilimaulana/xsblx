@@ -11,6 +11,11 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **The server exports traces over OTLP and logs structured JSON.** Set
+  `OTEL_EXPORTER_OTLP_ENDPOINT` to export spans; with it unset nothing is sent.
+  `OTEL_SERVICE_NAME` (default `xsblx-server`), `LOG_LEVEL` (default `Info`) and
+  `LOG_FORMAT` (`json` or `pretty`, defaulting by `NODE_ENV`) are the other
+  knobs. See [ADR 0015](docs/technical/adr/0015-effect-native-observability-over-otlp.md).
 - **`WORKERS` runs the server as several processes sharing one port.** Accepts a
   positive integer or `auto` (every core); defaults to `1`, and `compose.yaml`
   sets `4`. Linux only — macOS does not balance connections across workers. See
