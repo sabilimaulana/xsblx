@@ -155,18 +155,18 @@ files at pre-commit; hooks install via the root `prepare` script.
   and not by the HTTP layer.** `autocannon` against the container image, authed
   `GET /todos`, session cookie cache warm:
 
-  | Config              | req/s  | Note                                   |
-  | ------------------- | ------ | -------------------------------------- |
-  | `/health`, no auth  | 49,000 | Bun + Effect router + encode           |
-  | `WORKERS=1`         | 5,276  | one core saturated (134% CPU)          |
-  | `WORKERS=2`         | 9,907  |                                        |
-  | `WORKERS=4`         | 12,050 | peak on a 10-core machine              |
-  | `WORKERS=6`         | 10,950 | contention                             |
-  | `WORKERS=10`        | 6,751  | oversubscribed, worse than 4           |
+  | Config             | req/s  | Note                          |
+  | ------------------ | ------ | ----------------------------- |
+  | `/health`, no auth | 49,000 | Bun + Effect router + encode  |
+  | `WORKERS=1`        | 5,276  | one core saturated (134% CPU) |
+  | `WORKERS=2`        | 9,907  |                               |
+  | `WORKERS=4`        | 12,050 | peak on a 10-core machine     |
+  | `WORKERS=6`        | 10,950 | contention                    |
+  | `WORKERS=10`       | 6,751  | oversubscribed, worse than 4  |
 
   Postgres is not the constraint: it sits at **0.09% CPU** under load, and a
   transaction count shows `/todos` doing ~1 query per request while
-  `/api/auth/get-session` does 2 per *200* requests once the cookie cache is warm.
+  `/api/auth/get-session` does 2 per _200_ requests once the cookie cache is warm.
   What remains is Better Auth's own per-request work — routing plus verifying,
   parsing and validating the signed cookie — which runs outside the Effect runtime
   (ADR 0007) and is charged to every authenticated route regardless of what the
@@ -175,7 +175,7 @@ files at pre-commit; hooks install via the root `prepare` script.
   Two traps this measurement walked into, both worth avoiding when re-running it.
   The cookie cache has a **60s `maxAge`**: a bench cookie older than that silently
   measures the uncached DB path (~3.8k, and flat under worker scaling, because
-  that path *is* I/O-bound). And **SO_REUSEPORT only load-balances on Linux** —
+  that path _is_ I/O-bound). And **SO_REUSEPORT only load-balances on Linux** —
   on macOS the kernel hands every connection to one socket, so extra workers idle
   at 0% CPU and clustering looks like a no-op. Benchmark worker counts in the
   container, never on the host.
@@ -184,6 +184,7 @@ files at pre-commit; hooks install via the root `prepare` script.
   Effect middleware and call `auth.api.getSession` only on a cache miss. That
   reimplements a Better Auth format ADR 0007 deliberately avoids, so it needs its
   own ADR — and a second datastore for sessions is not the answer.
+
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.
