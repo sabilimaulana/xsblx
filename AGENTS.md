@@ -65,6 +65,9 @@ Effect owns all three signals; never add another library for them (ADR 0015).
   the feature invisible in a trace.
 - **Log through `Effect.log*`.** Never `console.log`: it bypasses the configured
   logger, the level filter and the span context.
+- **A metric answers what a trace cannot.** Spans already carry per-call latency
+  and counts, so reach for `Metric` only for a total or a distribution no single
+  trace shows. One per feature is usually too many.
 - **Import `@effect/opentelemetry` by subpath** (`/NodeSdk`). The package root
   re-exports `WebSdk` and crashes the server at startup.
 - Exporter wiring lives in `apps/server/src/observability.ts`. It is

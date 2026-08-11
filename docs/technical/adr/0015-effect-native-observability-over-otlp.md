@@ -1,6 +1,6 @@
 ---
 status: accepted
-version: 1.0.0
+version: 1.1.0
 updated: 2026-08-11
 ---
 
@@ -49,27 +49,28 @@ version and requires `effect@^4.0.0-beta.103`.
 Its `@opentelemetry/*` dependencies are peers — all optional except
 `semantic-conventions` — so they install explicitly and at exact versions. The
 server image resolves without `bun.lock` (ADR 0014), which makes a range unsafe
-here. `sdk-logs` and `sdk-metrics` are type-only imports of `NodeSdk` and are
-required for `typecheck` even though no metrics or logs are exported yet:
+here. `sdk-logs` is a type-only import of `NodeSdk`, required for `typecheck`
+even though no logs are exported:
 
-| Package                                   | Version   |
-| ----------------------------------------- | --------- |
-| `@opentelemetry/api`                      | `1.9.1`   |
-| `@opentelemetry/api-logs`                 | `0.221.0` |
-| `@opentelemetry/sdk-logs`                 | `0.221.0` |
-| `@opentelemetry/resources`                | `2.10.0`  |
-| `@opentelemetry/sdk-metrics`              | `2.10.0`  |
-| `@opentelemetry/sdk-trace-base`           | `2.10.0`  |
-| `@opentelemetry/sdk-trace-node`           | `2.10.0`  |
-| `@opentelemetry/semantic-conventions`     | `1.43.0`  |
-| `@opentelemetry/exporter-trace-otlp-http` | `0.221.0` |
+| Package                                     | Version   |
+| ------------------------------------------- | --------- |
+| `@opentelemetry/api`                        | `1.9.1`   |
+| `@opentelemetry/api-logs`                   | `0.221.0` |
+| `@opentelemetry/sdk-logs`                   | `0.221.0` |
+| `@opentelemetry/resources`                  | `2.10.0`  |
+| `@opentelemetry/sdk-metrics`                | `2.10.0`  |
+| `@opentelemetry/sdk-trace-base`             | `2.10.0`  |
+| `@opentelemetry/sdk-trace-node`             | `2.10.0`  |
+| `@opentelemetry/semantic-conventions`       | `1.43.0`  |
+| `@opentelemetry/exporter-trace-otlp-http`   | `0.221.0` |
+| `@opentelemetry/exporter-metrics-otlp-http` | `0.221.0` |
 
 The OTel SDK versions two independent lines — `api` and the SDK packages on 1.x
 and 2.x, the exporters and logs packages on 0.x — so these are picked by hand
 against the peer ranges rather than moved together.
 
-Only the trace exporter is installed. The metrics and logs OTLP exporters are
-not, because nothing imports them; they go in when metrics or log export do.
+The logs OTLP exporter is not installed, because nothing imports it — logs reach
+a collector as container stdout instead. It goes in if log export ever does.
 
 `@opentelemetry/sdk-trace-web` is a declared peer and is deliberately not
 installed — Bun implements the Node API surface, so the server takes
@@ -79,10 +80,10 @@ package root fails with `Cannot find module '@opentelemetry/sdk-trace-web'`,
 because the barrel re-exports `WebSdk`. Server code imports
 `@effect/opentelemetry/NodeSdk` by subpath.
 
-The exporter endpoint comes from config and defaults to unset. With no endpoint
-the tracing layer is a no-op and the process runs with no backend and no
-network calls — cloning this repo into a real project means setting one
-environment variable. Jaeger runs as a compose profile for local use, per
+One endpoint carries both signals, comes from config and defaults to unset. With
+no endpoint neither the span processor nor the metric reader is installed, and
+the process runs with no backend and no network calls — cloning this repo into a
+real project means setting one environment variable. Jaeger runs as a compose profile for local use, per
 ADR 0014's rule that a new service is a profile and not a second compose file.
 
 Observability is infrastructure, not a feature slice. The layer is built in
@@ -108,12 +109,19 @@ The three signals carry different weight:
   HTTP round-trip on the hot path of the request it measures. The spans
   themselves already exist: `Effect.fn("Todos.list")` in the service, `http.span`
   from `HttpApi`, so a trace runs request → service without further wiring.
-- **Metrics.** HTTP duration and count come from the server layer. Domain
-  counters are added where a specific question needs answering, not up front.
+- **Metrics.** Pushed to `${endpoint}/v1/metrics` by a
+  `PeriodicExportingMetricReader` on its own 60s default interval, alongside
+  `Metric.enableRuntimeMetricsLayer` for Effect's fiber gauges. Both are enabled
+  only when an endpoint is configured — collecting with nothing to export to is
+  pure overhead. Effect's HTTP server emits **no** request metrics of its own;
+  `HttpMiddleware` has no metrics member, so request rate and latency come from
+  span data, not from a counter. Domain counters are added where a specific
+  question needs answering — `todos_created_total` in `features/todos/service.ts`
+  is the one exemplar, and the pattern a copied feature follows.
 
 ## Consequences
 
-- Nine new exact-pinned `@opentelemetry/*` dependencies in `apps/server`. Every
+- Ten new exact-pinned `@opentelemetry/*` dependencies in `apps/server`. Every
   one is a manual bump, and the two OTel version lines move independently — a
   bump means re-checking the peer ranges of `@effect/opentelemetry`, not matching
   version numbers across the table.
@@ -128,8 +136,11 @@ The three signals carry different weight:
   incomplete, the same way one without tests is.
 - With no endpoint set, spans are still built on every request and thrown away.
   That cost is paid whether or not anything is exporting.
+- Metrics resolve at 60s and the reader takes no environment variable, so a
+  faster interval is a code change. Shutdown force-flushes, so a short-lived
+  process still reports.
 - Reversing the export is cheap — delete `observability.ts`, its line in
-  `index.ts`, the config entries and ten dependencies. Reversing the
+  `index.ts`, the config entries and eleven dependencies. Reversing the
   instrumentation is not: the `Effect.fn` span names are spread across every
   service by design.
 - Traces stop at the process boundary in one place: Better Auth runs outside the

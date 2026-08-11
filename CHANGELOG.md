@@ -11,6 +11,9 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **The server exports metrics over OTLP**, on a 60s interval and on shutdown:
+  Effect's fiber runtime gauges plus `todos_created_total`. Same endpoint as
+  traces; nothing is exported when it is unset.
 - **The server exports traces over OTLP and logs structured JSON.** Set
   `OTEL_EXPORTER_OTLP_ENDPOINT` to export spans; with it unset nothing is sent.
   `OTEL_SERVICE_NAME` (default `xsblx-server`), `LOG_LEVEL` (default `Info`) and

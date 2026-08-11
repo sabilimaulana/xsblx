@@ -2,9 +2,11 @@
 // which imports `@opentelemetry/sdk-trace-web` — an optional peer this server does
 // not install, so the root import fails at runtime (ADR 0015).
 import * as NodeSdk from "@effect/opentelemetry/NodeSdk";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Effect, Layer, Logger, Option, References } from "effect";
+import { Effect, Layer, Logger, Metric, Option, References } from "effect";
 import { ObservabilityConfig } from "./config.ts";
 
 /**
@@ -19,7 +21,8 @@ export const ObservabilityLive = Layer.unwrap(
   Effect.map(ObservabilityConfig, (config) => {
     const tracing = Option.match(config.otlpEndpoint, {
       // No endpoint configured: `layerEmpty` installs the resource without any
-      // span processor, so spans are created and discarded rather than sent.
+      // span processor or metric reader, so both signals are produced and
+      // discarded rather than sent.
       onNone: () => NodeSdk.layerEmpty,
       onSome: (endpoint) =>
         NodeSdk.layer(() => ({
@@ -29,7 +32,18 @@ export const ObservabilityLive = Layer.unwrap(
           spanProcessor: new BatchSpanProcessor(
             new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
           ),
-        })),
+          // Metrics are pushed on a timer, not scraped. The reader's own 60s
+          // default is the export resolution; it takes no env var, so a faster
+          // one means passing `exportIntervalMillis` here.
+          metricReader: new PeriodicExportingMetricReader({
+            exporter: new OTLPMetricExporter({ url: `${endpoint}/v1/metrics` }),
+          }),
+        })).pipe(
+          // Fiber counts, and the other runtime gauges Effect keeps internally.
+          // Only enabled alongside a reader — collecting them with nothing to
+          // export to is pure overhead.
+          Layer.provideMerge(Metric.enableRuntimeMetricsLayer),
+        ),
     });
 
     return Layer.mergeAll(
