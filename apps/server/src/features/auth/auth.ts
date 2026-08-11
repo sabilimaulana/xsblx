@@ -20,4 +20,15 @@ export const auth = betterAuth({
     .split(",")
     .map((origin) => origin.trim()),
   emailAndPassword: { enabled: true, minPasswordLength: MIN_PASSWORD_LENGTH },
+  /**
+   * Every authenticated request otherwise costs a session lookup, which caps the
+   * whole API around 5k req/s regardless of what the endpoint does (see
+   * architecture.md, "Known ceilings"). The signed session travels in the cookie
+   * instead, so the DB is only consulted once the cache expires.
+   *
+   * The cost is revocation lag: a deleted session or a changed role stays live
+   * for up to `maxAge`. 60s keeps that window short — Better Auth's own default
+   * is 300s, which is a long time to honour a signed-out token.
+   */
+  session: { cookieCache: { enabled: true, maxAge: 60 } },
 });

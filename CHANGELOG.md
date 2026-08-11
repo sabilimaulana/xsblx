@@ -11,6 +11,10 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **Sessions are cached in a signed cookie for 60s**, so an authenticated request
+  no longer costs a database lookup. Revoking a session now takes effect after up
+  to 60s rather than immediately.
+
 - **The TanStack devtools no longer ship in the production web bundle.** They
   render behind `import.meta.env.DEV` and moved to `devDependencies`, along with
   the other build-time-only packages in `apps/web` (`nitro`, `tailwindcss`,
