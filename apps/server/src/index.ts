@@ -3,7 +3,8 @@ import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
-import { CorsConfig, ServerConfig } from "./config.ts";
+import cluster from "node:cluster";
+import { CorsConfig, ServerConfig, workerCount } from "./config.ts";
 import { AuthRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
 import { HealthHandlers } from "./features/health/http.ts";
@@ -36,4 +37,13 @@ const HttpServerLayer = Layer.unwrap(
   ),
 ).pipe(Layer.provide(BunHttpServer.layerConfig(ServerConfig)));
 
-Layer.launch(HttpServerLayer).pipe(BunRuntime.runMain);
+// The primary only supervises: `cluster` restarts a worker that dies, and every
+// worker runs the same `Bun.serve` on the shared port. With WORKERS=1 (the
+// default) this branch is skipped entirely and the process serves directly.
+const workers = workerCount();
+if (cluster.isPrimary && workers > 1) {
+  for (let i = 0; i < workers; i++) cluster.fork();
+  cluster.on("exit", () => cluster.fork());
+} else {
+  Layer.launch(HttpServerLayer).pipe(BunRuntime.runMain);
+}

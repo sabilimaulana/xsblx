@@ -80,6 +80,17 @@
             }
           },
           {
+            // `workerCount` is read before the Effect runtime exists — the
+            // primary forks on it, so it cannot come from a `Config`. Only
+            // `processEnv` is relaxed; the rest of the file is normal Effect.
+            "include": ["**/src/config.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "processEnv": "off"
+              }
+            }
+          },
+          {
             // React/TanStack callbacks (route loaders, form onSubmit) are async
             // by API contract; Effect only enters apps/web through runApi.
             "include": ["**/*.tsx", "**/routes/**"],

@@ -151,21 +151,39 @@ files at pre-commit; hooks install via the root `prepare` script.
 
 - **No pagination on list endpoints.** `Todos` list returns every row for the
   user. Fine at current scale; a per-user cap plus cursor pagination is the fix.
-- **~5k req/s on any authenticated route, set by session lookup — not by the
-  HTTP layer.** Measured locally with `autocannon` against `bun src/index.ts`:
-  `/health` sustains 44.5k req/s (p50 1ms, p99 2ms), so Bun's server plus the
-  Effect router and schema encode are not the constraint. `/api/auth/get-session`
-  alone drops that to 5.4k (p50 9ms), and `/todos` — auth plus the query — to
-  5.0k, meaning the todos query costs ~8% and Better Auth's per-request DB
-  round-trip costs the other 89%. The ceiling is a queue, not a starved pool:
-  throughput is flat from 10 to 200 concurrent connections while latency grows
-  linearly (1ms → 41ms p50) with 17 Postgres backends open. Because auth runs
-  outside the Effect runtime (ADR 0007), this tax is fixed per request and
-  independent of what the endpoint does — a route that touches nothing pays the
-  same 9ms as one that reads everything. The fix, when traffic justifies it, is
-  Better Auth's cookie cache (signed session in the cookie, no DB hit), which is
-  a config change inside `features/auth/auth.ts` rather than an architectural
-  one. Do not reach for a second datastore for sessions before trying it.
+- **Authenticated throughput is bounded by per-request auth CPU, not by Postgres
+  and not by the HTTP layer.** `autocannon` against the container image, authed
+  `GET /todos`, session cookie cache warm:
+
+  | Config              | req/s  | Note                                   |
+  | ------------------- | ------ | -------------------------------------- |
+  | `/health`, no auth  | 49,000 | Bun + Effect router + encode           |
+  | `WORKERS=1`         | 5,276  | one core saturated (134% CPU)          |
+  | `WORKERS=2`         | 9,907  |                                        |
+  | `WORKERS=4`         | 12,050 | peak on a 10-core machine              |
+  | `WORKERS=6`         | 10,950 | contention                             |
+  | `WORKERS=10`        | 6,751  | oversubscribed, worse than 4           |
+
+  Postgres is not the constraint: it sits at **0.09% CPU** under load, and a
+  transaction count shows `/todos` doing ~1 query per request while
+  `/api/auth/get-session` does 2 per *200* requests once the cookie cache is warm.
+  What remains is Better Auth's own per-request work — routing plus verifying,
+  parsing and validating the signed cookie — which runs outside the Effect runtime
+  (ADR 0007) and is charged to every authenticated route regardless of what the
+  endpoint does.
+
+  Two traps this measurement walked into, both worth avoiding when re-running it.
+  The cookie cache has a **60s `maxAge`**: a bench cookie older than that silently
+  measures the uncached DB path (~3.8k, and flat under worker scaling, because
+  that path *is* I/O-bound). And **SO_REUSEPORT only load-balances on Linux** —
+  on macOS the kernel hands every connection to one socket, so extra workers idle
+  at 0% CPU and clustering looks like a no-op. Benchmark worker counts in the
+  container, never on the host.
+
+  Next lever, if 12k is ever the constraint: verify the signed cookie inside the
+  Effect middleware and call `auth.api.getSession` only on a cache miss. That
+  reimplements a Better Auth format ADR 0007 deliberately avoids, so it needs its
+  own ADR — and a second datastore for sessions is not the answer.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.

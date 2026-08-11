@@ -9,6 +9,13 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Added
+
+- **`WORKERS` runs the server as several processes sharing one port.** Accepts a
+  positive integer or `auto` (every core); defaults to `1`, and `compose.yaml`
+  sets `4`. Linux only — macOS does not balance connections across workers. See
+  `architecture.md` for the measured worker/throughput curve.
+
 ### Changed
 
 - **Sessions are cached in a signed cookie for 60s**, so an authenticated request
