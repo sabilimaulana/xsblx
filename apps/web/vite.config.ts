@@ -22,7 +22,13 @@ const config = defineConfig({
   server: { port },
   preview: { port },
   resolve: { tsconfigPaths: true },
-  plugins: [devtools(), tailwindcss(), tanstackStart(), nitro(), viteReact()],
+  plugins: [
+    devtools(),
+    tailwindcss(),
+    tanstackStart(),
+    nitro({ plugins: ["./src/access-log.ts"] }),
+    viteReact(),
+  ],
 });
 
 export default config;

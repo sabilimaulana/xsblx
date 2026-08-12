@@ -11,6 +11,10 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **The web server logs one access line per request** —
+  `METHOD path?query status duration` — from a Nitro plugin
+  (`apps/web/src/access-log.ts`), in dev and in the `.output/` build. Static
+  files (anything with a file extension, e.g. `/assets/*`) are not logged.
 - **`GET /todos` takes `status`, `limit` and `cursor` query params.** `status` is
   `all` (default), `open` or `done`; `limit` defaults to 20 and is capped at 100;
   `cursor` is the id of the last todo on the previous page. The response is now

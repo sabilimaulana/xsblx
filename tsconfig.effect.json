@@ -91,6 +91,16 @@
             }
           },
           {
+            // The Nitro access-log plugin runs in the frontend server, outside
+            // the Effect runtime — there is no configured logger to reach.
+            "include": ["**/src/access-log.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "globalConsole": "off"
+              }
+            }
+          },
+          {
             // React/TanStack callbacks (route loaders, form onSubmit) are async
             // by API contract; Effect only enters apps/web through runApi.
             "include": ["**/*.tsx", "**/routes/**"],
