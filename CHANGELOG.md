@@ -42,6 +42,18 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **`tsconfig.effect.json` now errors on every `@effect/language-service` rule
+  except five formatting-taste ones** (`missedPipeableOpportunity`,
+  `unnecessaryArrowBlock`, `effectFnOpportunity`, `lazyEffect`,
+  `strictBooleanExpressions`). New override: `strictEffectProvide` is off for
+  entry points (`migrate.ts`, `main.ts`, `index.ts`).
+- **Service and context keys carry their module path** (`deterministicKeys`):
+  `api/CurrentUser` → `@xsblx/api/features/auth/middleware/CurrentUser`,
+  `web/ApiClient` → `web/lib/api-client/ApiClient`, `server/Todos` →
+  `server/features/todos/service/Todos`.
+- **Schema classes are constructed with `.make(...)`, not `new`**
+  (`newSchemaClass`) — `Todo`, `TodoPage`, `TodosError`, `TodoNotFound`,
+  `Unauthorized`.
 - **`better-auth` and `@better-auth/drizzle-adapter` move to the `auth` catalog.**
   Bump them in the root `package.json`, not in `apps/server` or `apps/web`.
 - **The `todos` index is `(userId, id DESC)`**, replacing `todos_userId_idx`. It

@@ -14,7 +14,7 @@ type TodoRow = typeof todos.$inferSelect;
 
 /** The DB row shape is an implementation detail; the domain type is what leaves this module. */
 const toDomain = (row: TodoRow): Todo =>
-  new Todo({
+  Todo.make({
     id: TodoId.make(row.id),
     title: row.title,
     completed: row.completed,
@@ -61,7 +61,7 @@ export class Todos extends Context.Service<
     ): Effect.Effect<Todo, TodosError>;
     remove(userId: string, id: TodoId): Effect.Effect<void, TodosError>;
   }
->()("server/Todos") {
+>()("server/features/todos/service/Todos") {
   static readonly layer = Layer.effect(
     Todos,
     Effect.gen(function* () {
@@ -94,7 +94,7 @@ export class Todos extends Context.Service<
 
         const hasMore = rows.length > page.limit;
         const items = (hasMore ? rows.slice(0, page.limit) : rows).map(toDomain);
-        return new TodoPage({
+        return TodoPage.make({
           items,
           nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
         });
@@ -110,7 +110,7 @@ export class Todos extends Context.Service<
           .pipe(Effect.orDie);
         const row = rows[0];
         if (row === undefined) {
-          return yield* new TodosError({ reason: new TodoNotFound({ id }) });
+          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
         }
         return toDomain(row);
       });
@@ -142,7 +142,7 @@ export class Todos extends Context.Service<
           .pipe(Effect.orDie);
         const row = rows[0];
         if (row === undefined) {
-          return yield* new TodosError({ reason: new TodoNotFound({ id }) });
+          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
         }
         return toDomain(row);
       });
@@ -154,7 +154,7 @@ export class Todos extends Context.Service<
           .returning({ id: todos.id })
           .pipe(Effect.orDie);
         if (rows.length === 0) {
-          return yield* new TodosError({ reason: new TodoNotFound({ id }) });
+          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
         }
       });
 

@@ -11,7 +11,7 @@ const baseUrl = import.meta.env["VITE_API_URL"] ?? "http://localhost:3000";
  * changes on the server break this at compile time.
  */
 export class ApiClient extends Context.Service<ApiClient, HttpApiClient.ForApi<typeof Api>>()(
-  "web/ApiClient",
+  "web/lib/api-client/ApiClient",
 ) {
   static readonly layer = Layer.effect(
     ApiClient,

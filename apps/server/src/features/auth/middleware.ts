@@ -20,7 +20,7 @@ export const AuthenticationLive = Layer.effect(
           auth.api.getSession({ headers: (request.source as Request).headers }),
         );
         if (session === null) {
-          return yield* new Unauthorized();
+          return yield* Unauthorized.make();
         }
         return { id: session.user.id, email: session.user.email };
       }),

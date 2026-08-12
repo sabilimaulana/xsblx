@@ -15,7 +15,7 @@ export class Unauthorized extends Schema.TaggedErrorClass<Unauthorized>()(
 export class CurrentUser extends Context.Service<
   CurrentUser,
   { readonly id: string; readonly email: string }
->()("api/CurrentUser") {}
+>()("@xsblx/api/features/auth/middleware/CurrentUser") {}
 
 /**
  * Declared here rather than in `apps/server` because it is part of the API

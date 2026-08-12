@@ -2,6 +2,10 @@
   "$schema": "./node_modules/@effect/tsgo/schema.json",
   // Shared @effect/language-service severities. Every workspace that uses Effect
   // extends this so a rule is configured once, not per app.
+  //
+  // Policy: every correctness, anti-pattern and effect-native rule the plugin
+  // ships is an error. Style rules that only rewrite working code are off.
+  // Two rules stay off deliberately — see the end of the block.
   "compilerOptions": {
     "plugins": [
       {
@@ -9,6 +13,7 @@
         "diagnosticSeverity": {
           // correctness — these are bugs
           "floatingEffect": "error",
+          "floatingEffectInVitest": "error",
           "missingEffectContext": "error",
           "missingEffectError": "error",
           "missingLayerContext": "error",
@@ -23,6 +28,31 @@
           "anyUnknownInErrorContext": "error",
           "unsafeEffectTypeAssertion": "error",
           "duplicatePackage": "error",
+          "genericEffectServices": "error",
+          "nonObjectEffectServiceType": "error",
+          "overriddenSchemaConstructor": "error",
+          "schemaLiteralNonFinite": "error",
+          "schemaOpaqueInstanceMember": "error",
+          // anti-pattern — types check, runtime behaviour is wrong
+          "catchUnfailableEffect": "error",
+          "effectFnIife": "error",
+          "effectGenUsesAdapter": "error",
+          "effectInFailure": "error",
+          "globalErrorInEffectCatch": "error",
+          "globalErrorInEffectFailure": "error",
+          "unknownInEffectCatch": "error",
+          "layerMergeAllWithDependencies": "error",
+          "lazyPromiseInEffectSync": "error",
+          "leakingRequirements": "error",
+          "multipleEffectProvide": "error",
+          "strictEffectProvide": "error",
+          "runEffectInsideEffect": "error",
+          "schemaSyncInEffect": "error",
+          "scopeInLayerEffect": "error",
+          "serviceNotAsClass": "error",
+          "missingEffectServiceDependency": "error",
+          "preferUnsafeConstructor": "error",
+          "tryCatchInEffectGen": "error",
           // effect-native preset — repo policy is "Effect for everything effectful"
           "abortControllerInEffect": "error",
           "asyncFunction": "error",
@@ -45,13 +75,43 @@
           "preferSchemaOverJson": "error",
           "processEnv": "error",
           "processEnvInEffect": "error",
-          "tryCatchInEffectGen": "error",
-          // style — suggestions only, never block typecheck
+          // style that deletes a redundant construct or picks the sharper API —
+          // mechanical to obey, so it is an error like the rest
+          "catchAllToMapError": "error",
+          "catchChainToFirstSuccessOf": "error",
+          "catchTagToCatchReason": "error",
+          "catchToIgnore": "error",
+          "catchToOrElseSucceed": "error",
+          "effectDoNotation": "error",
+          "effectMapFlatten": "error",
+          "effectMapVoid": "error",
+          "effectSucceedWithVoid": "error",
+          "flatMapToMap": "error",
+          "multipleCatchTag": "error",
+          "nestedEffectGenYield": "error",
+          "preferSchemaTypeProperty": "error",
+          "preferTypedSchemaDecoder": "error",
+          "redundantMapError": "error",
+          "redundantOrDie": "error",
+          "redundantSchemaTagIdentifier": "error",
+          "schemaNumber": "error",
+          "schemaStructWithTag": "error",
+          "schemaUnionOfLiterals": "error",
+          "syncToSucceed": "error",
+          "unnecessaryEffectGen": "error",
+          "unnecessaryFailYieldableError": "error",
+          "unnecessaryPipe": "error",
+          "unnecessaryPipeChain": "error",
+          "unnecessaryTypeofType": "error",
+          "missingPipeableSignature": "error",
+          // style — formatting taste, never blocks typecheck
           "missedPipeableOpportunity": "off",
           "unnecessaryArrowBlock": "off",
           "effectFnOpportunity": "off",
           "lazyEffect": "off",
-          "strictBooleanExpressions": "off"
+          "strictBooleanExpressions": "off",
+          "deterministicKeys": "error",
+          "newSchemaClass": "error"
         },
         "overrides": [
           {
@@ -97,6 +157,16 @@
             "options": {
               "diagnosticSeverity": {
                 "globalConsole": "off"
+              }
+            }
+          },
+          {
+            // Entry points are the one place a Layer is provided — which is
+            // what strictEffectProvide exists to keep out of everywhere else.
+            "include": ["**/src/migrate.ts", "**/src/main.ts", "**/src/index.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "strictEffectProvide": "off"
               }
             }
           },
