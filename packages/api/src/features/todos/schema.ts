@@ -1,7 +1,41 @@
 import { Effect, Schema } from "effect";
+import { ID_ALPHABET, ID_LENGTH, IdString } from "../../id.ts";
 
-export const TodoId = Schema.Int.pipe(Schema.brand("TodoId"));
+export const TodoId = IdString.pipe(Schema.brand("TodoId"));
 export type TodoId = typeof TodoId.Type;
+
+/**
+ * Keyset cursor for `GET /todos`, as `<createdAt ISO>|<id>`.
+ *
+ * A nanoid carries no ordering, so the sort key is `(createdAt, id)` and the
+ * cursor has to carry both — the id alone breaks down the moment two todos share
+ * a millisecond. The pattern is exact (`toISOString` has one form, and neither
+ * half can contain `|`), so a cursor that decodes is safe to split.
+ */
+const TODO_CURSOR_PATTERN = new RegExp(
+  `^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\\|[${ID_ALPHABET}]{${ID_LENGTH}}$`,
+);
+
+export const TodoCursor = Schema.String.check(
+  Schema.isPattern(TODO_CURSOR_PATTERN, { message: "Malformed cursor" }),
+).pipe(Schema.brand("TodoCursor"));
+export type TodoCursor = typeof TodoCursor.Type;
+
+export const todoCursor = (todo: { readonly createdAt: Date; readonly id: TodoId }): TodoCursor =>
+  TodoCursor.make(`${todo.createdAt.toISOString()}|${todo.id}`);
+
+/**
+ * Splits a cursor back into its two halves. Safe because `TodoCursor` only
+ * exists once the pattern above has matched.
+ *
+ * `createdAt` stays the ISO string it was encoded as — the only consumer binds
+ * it as a `timestamptz` parameter, and a round-trip through `Date` would only
+ * add a way to lose precision.
+ */
+export const todoCursorParts = (cursor: TodoCursor): { createdAt: string; id: TodoId } => {
+  const [createdAt, id] = cursor.split("|") as [string, string];
+  return { createdAt, id: TodoId.make(id) };
+};
 
 // The message annotation is what a form renders on failure; without it the
 // default formatter falls back to the filter's `expected` text.
@@ -54,9 +88,9 @@ export const TodoListQuery = {
   limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: TODO_PAGE_MAX })).pipe(
     Schema.withDecodingDefaultTypeKey(Effect.succeed(TODO_PAGE_DEFAULT)),
   ),
-  // Keyset cursor: the id of the last todo on the previous page. Absent means
-  // "from the start".
-  cursor: Schema.optional(TodoId),
+  // Keyset cursor: the sort key of the last todo on the previous page. Absent
+  // means "from the start".
+  cursor: Schema.optional(TodoCursor),
 };
 
 /**
@@ -65,5 +99,5 @@ export const TodoListQuery = {
  */
 export class TodoPage extends Schema.Class<TodoPage>("TodoPage")({
   items: Schema.Array(Todo),
-  nextCursor: Schema.NullOr(TodoId),
+  nextCursor: Schema.NullOr(TodoCursor),
 }) {}

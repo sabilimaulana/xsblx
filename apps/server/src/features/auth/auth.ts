@@ -2,6 +2,7 @@ import { MIN_PASSWORD_LENGTH } from "@xsblx/api/auth/credentials";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/bun-sql";
+import { newId } from "../../id.ts";
 import * as authSchema from "./schema.ts";
 
 /**
@@ -20,6 +21,12 @@ export const auth = betterAuth({
     .split(",")
     .map((origin) => origin.trim()),
   emailAndPassword: { enabled: true, minPasswordLength: MIN_PASSWORD_LENGTH },
+  /**
+   * Better Auth's own generator is a nanoid over a different alphabet; every id
+   * in this system is the same 21-character shape instead (ADR 0017), so a user
+   * id and a todo id are told apart by their column, not their format.
+   */
+  advanced: { database: { generateId: () => newId() } },
   /**
    * Every authenticated request otherwise costs a session lookup, which caps the
    * whole API around 5k req/s regardless of what the endpoint does (see

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./api": "./src/api.ts",
+    "./id": "./src/id.ts",
     "./*": "./src/features/*.ts"
   },
   "scripts": {

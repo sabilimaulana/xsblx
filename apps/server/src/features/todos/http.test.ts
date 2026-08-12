@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest";
 import { TodosApiGroup } from "@xsblx/api/todos/group";
 import type { TodoStatus } from "@xsblx/api/todos/schema";
-import { TodoId } from "@xsblx/api/todos/schema";
+import { TodoCursor } from "@xsblx/api/todos/schema";
 import { Effect, Result, Schema } from "effect";
 
 /**
@@ -17,7 +17,7 @@ import { Effect, Result, Schema } from "effect";
 // restated here. It is the assertion, not a convenience: this is the contract the
 // handler is written against.
 const listQuery = TodosApiGroup.endpoints.list.query as unknown as Schema.Codec<
-  { readonly status: TodoStatus; readonly limit: number; readonly cursor?: TodoId },
+  { readonly status: TodoStatus; readonly limit: number; readonly cursor?: TodoCursor },
   unknown
 >;
 
@@ -32,12 +32,22 @@ it.effect("applies the query defaults when nothing is supplied", () =>
 
 it.effect("parses query strings into the decoded types", () =>
   Effect.gen(function* () {
-    const result = yield* decode({ status: "done", limit: "5", cursor: "12" });
+    const cursor = "2026-08-12T09:30:00.000Z|V1StGXR8Z5jdHi6BmyTaP";
+    const result = yield* decode({ status: "done", limit: "5", cursor });
     assert.deepStrictEqual(Result.getOrThrow(result), {
       status: "done",
       limit: 5,
-      cursor: TodoId.make(12),
+      cursor: TodoCursor.make(cursor),
     });
+  }),
+);
+
+it.effect("rejects a malformed cursor", () =>
+  Effect.gen(function* () {
+    // A bare id: valid before the sort key became `(createdAt, id)`, and now
+    // meaningless. It must fail decoding rather than silently page from the start.
+    const result = yield* decode({ cursor: "V1StGXR8Z5jdHi6BmyTaP" });
+    assert.strictEqual(result._tag, "Failure");
   }),
 );
 

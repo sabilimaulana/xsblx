@@ -1,4 +1,4 @@
-import type { TodoId, TodoStatus } from "@xsblx/api/todos/schema";
+import type { TodoCursor, TodoId, TodoStatus } from "@xsblx/api/todos/schema";
 import { TodoCreateStandard } from "@xsblx/api/todos/schema";
 import { Button } from "@xsblx/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/card";
@@ -34,7 +34,7 @@ const listTodos = (status: TodoStatus) =>
           query: { status, limit: PAGE_SIZE, cursor: pageParam ?? undefined },
         }),
       ),
-    initialPageParam: null as TodoId | null,
+    initialPageParam: null as TodoCursor | null,
     // `null` from the server means the last page; TanStack reads that as "no
     // next page" and disables `fetchNextPage`.
     getNextPageParam: (page) => page.nextCursor,

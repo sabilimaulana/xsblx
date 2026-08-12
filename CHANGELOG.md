@@ -42,6 +42,15 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **Every id is now a 21-character nanoid over `0-9A-Za-z`.** `todos.id` is text
+  instead of a serial integer, and Better Auth mints user, session and account
+  ids through the same generator. `-` and `_` are excluded from the alphabet.
+  Existing todo ids are rewritten by the migration. See
+  [ADR 0017](docs/technical/adr/0017-nanoid-primary-keys.md).
+- **The `GET /todos` cursor is now `<createdAt ISO>|<id>`, not a bare id.** A
+  nanoid carries no ordering, so the list sorts by `(createdAt, id)` descending
+  behind the new `todos_userId_createdAt_id_idx` index. `todos.createdAt` is
+  `timestamp(3)`. Cursors minted before this change are rejected.
 - **`tsconfig.effect.json` now errors on every `@effect/language-service` rule
   except five formatting-taste ones** (`missedPipeableOpportunity`,
   `unnecessaryArrowBlock`, `effectFnOpportunity`, `lazyEffect`,

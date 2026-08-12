@@ -1,4 +1,6 @@
 import { assert, layer } from "@effect/vitest";
+import type { TodoCursor, TodoPage } from "@xsblx/api/todos/schema";
+import { TodoId } from "@xsblx/api/todos/schema";
 import { Effect, Layer, Metric } from "effect";
 import { Drizzle, DrizzleLive } from "../../db/index.ts";
 import { user } from "../auth/schema.ts";
@@ -79,47 +81,40 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
     }),
   );
 
-  it.effect("pages newest-first by following nextCursor", () =>
+  /**
+   * The property that matters is that following the cursor walks the same list
+   * the unpaged query returns, once each. Asserting against creation order would
+   * be wrong: a nanoid carries no ordering, so rows sharing a millisecond are
+   * ordered by id — deterministic, but not the order they were inserted in.
+   *
+   * These five inserts land in the same millisecond often enough that this is
+   * also the regression test for the tie-break half of the cursor.
+   */
+  it.effect("pages the whole list once by following nextCursor", () =>
     Effect.gen(function* () {
       yield* seedUsers;
       const todos = yield* Todos;
 
-      // Created oldest to newest; the list is newest-first, so this reverses.
-      const created = yield* Effect.forEach(
-        [1, 2, 3, 4, 5],
-        (n) => todos.create(OWNER, { title: `todo ${n}` }),
-        { concurrency: 1 },
-      );
-      const newestFirst = created.map((todo) => todo.id).toReversed();
-
-      const first = yield* todos.list(OWNER, { status: "all", limit: 2 });
-      assert.deepStrictEqual(
-        first.items.map((todo) => todo.id),
-        newestFirst.slice(0, 2),
-      );
-      assert.strictEqual(first.nextCursor, newestFirst[1]);
-
-      const second = yield* todos.list(OWNER, {
-        status: "all",
-        limit: 2,
-        cursor: first.nextCursor ?? undefined,
+      yield* Effect.forEach([1, 2, 3, 4, 5], (n) => todos.create(OWNER, { title: `todo ${n}` }), {
+        concurrency: 1,
       });
-      assert.deepStrictEqual(
-        second.items.map((todo) => todo.id),
-        newestFirst.slice(2, 4),
-      );
 
-      // The final page is short of `limit`, so there is no cursor to follow.
-      const third = yield* todos.list(OWNER, {
-        status: "all",
-        limit: 2,
-        cursor: second.nextCursor ?? undefined,
-      });
-      assert.deepStrictEqual(
-        third.items.map((todo) => todo.id),
-        newestFirst.slice(4),
-      );
-      assert.strictEqual(third.nextCursor, null);
+      const unpaged = (yield* todos.list(OWNER, ALL)).items.map((todo) => todo.id);
+      assert.strictEqual(unpaged.length, 5);
+
+      const paged: Array<TodoId> = [];
+      let cursor: TodoCursor | undefined = undefined;
+      let pages = 0;
+      do {
+        const page: TodoPage = yield* todos.list(OWNER, { status: "all", limit: 2, cursor });
+        paged.push(...page.items.map((todo) => todo.id));
+        cursor = page.nextCursor ?? undefined;
+        pages += 1;
+      } while (cursor !== undefined);
+
+      assert.deepStrictEqual(paged, unpaged);
+      // 2 + 2 + 1: the final page is short of `limit`, so it carries no cursor.
+      assert.strictEqual(pages, 3);
     }),
   );
 
@@ -181,7 +176,9 @@ layer(Layer.mergeAll(Todos.layer, DrizzleLive))("Todos", (it) => {
   it.effect("fails with TodoNotFound for an unknown id", () =>
     Effect.gen(function* () {
       const todos = yield* Todos;
-      const error = yield* todos.getById(OWNER, -1 as never).pipe(Effect.flip);
+      const error = yield* todos
+        .getById(OWNER, TodoId.make("V1StGXR8Z5jdHi6BmyTaP"))
+        .pipe(Effect.flip);
       assert.strictEqual(error.reason._tag, "TodoNotFound");
     }),
   );

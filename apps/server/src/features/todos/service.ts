@@ -1,7 +1,7 @@
-import type { TodoStatus } from "@xsblx/api/todos/schema";
-import { Todo, TodoId, TodoPage } from "@xsblx/api/todos/schema";
+import type { TodoCursor, TodoStatus } from "@xsblx/api/todos/schema";
+import { Todo, TodoId, TodoPage, todoCursor, todoCursorParts } from "@xsblx/api/todos/schema";
 import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { Context, Effect, Layer, Metric } from "effect";
 import { Drizzle, DrizzleLive } from "../../db/index.ts";
 import { todos } from "./schema.ts";
@@ -40,7 +40,7 @@ const owned = (userId: string, id: TodoId) => and(eq(todos.id, id), eq(todos.use
 export type TodoListOptions = {
   readonly status: TodoStatus;
   readonly limit: number;
-  readonly cursor?: TodoId | undefined;
+  readonly cursor?: TodoCursor | undefined;
 };
 
 /**
@@ -68,35 +68,45 @@ export class Todos extends Context.Service<
       const db = yield* Drizzle;
 
       /**
-       * Keyset pagination: the cursor is the last id of the previous page and
-       * ordering is by id descending, which the `todos_userId_id_idx` index
-       * serves directly. `OFFSET` is not used — it re-scans every skipped row,
-       * so page 500 costs 500 pages of work and shifts under concurrent inserts.
+       * Keyset pagination: the cursor is the `(createdAt, id)` sort key of the
+       * last row of the previous page and ordering is by that pair descending,
+       * which the `todos_userId_createdAt_id_idx` index serves directly.
+       * `OFFSET` is not used — it re-scans every skipped row, so page 500 costs
+       * 500 pages of work and shifts under concurrent inserts.
+       *
+       * The predicate is a row-wise comparison rather than the `a < x OR (a = x
+       * AND b < y)` expansion: Postgres turns `(a, b) < (x, y)` into a single
+       * index seek, and the expansion is where an off-by-one drops or repeats
+       * the row on the page boundary.
        *
        * One row beyond `limit` is fetched to learn whether another page exists
        * without a second `COUNT` query.
        */
       const list = Effect.fn("Todos.list")(function* (userId: string, page: TodoListOptions) {
         yield* Effect.annotateCurrentSpan({ status: page.status, limit: page.limit });
+        const after = page.cursor === undefined ? undefined : todoCursorParts(page.cursor);
         const rows = yield* db
           .select()
           .from(todos)
           .where(
             and(
               eq(todos.userId, userId),
-              page.cursor === undefined ? undefined : lt(todos.id, page.cursor),
+              after === undefined
+                ? undefined
+                : sql`(${todos.createdAt}, ${todos.id}) < (${after.createdAt}::timestamptz, ${after.id})`,
               page.status === "all" ? undefined : eq(todos.completed, page.status === "done"),
             ),
           )
-          .orderBy(desc(todos.id))
+          .orderBy(desc(todos.createdAt), desc(todos.id))
           .limit(page.limit + 1)
           .pipe(Effect.orDie);
 
         const hasMore = rows.length > page.limit;
         const items = (hasMore ? rows.slice(0, page.limit) : rows).map(toDomain);
+        const last = items[items.length - 1];
         return TodoPage.make({
           items,
-          nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null,
+          nextCursor: hasMore && last !== undefined ? todoCursor(last) : null,
         });
       });
 

@@ -102,6 +102,11 @@ Effect owns all three signals; never add another library for them (ADR 0015).
   are a field record on the endpoint, the default and the cap live in that
   schema, the response is `{ items, nextCursor }`, and the index covers
   `(owner, sortColumn)`. No `OFFSET`, no unbounded `select()`.
+- **Ids are 21-character nanoids over `0-9A-Za-z`** (ADR 0017). Generate them
+  with `newId` from `apps/server/src/id.ts` — never `crypto.randomUUID`, never a
+  serial column. The shape is `IdString` in `packages/api/src/id.ts`; brand it
+  per feature. A list's sort key is `(createdAt, id)`, because a nanoid does not
+  sort.
 - **Handlers hold no business rules.** They map service error reasons onto the
   endpoint's declared errors; an unexpected reason is `Effect.die`.
 - **Tests hit real Postgres** (ADR 0004), and live beside the code they test

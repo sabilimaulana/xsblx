@@ -73,7 +73,9 @@ Central by necessity, not feature-folded:
 
 `GET /todos` is the worked example of a **paginated, filtered read** (ADR 0016):
 query params are a field record on the endpoint, defaults and the page cap live
-in the schema, the service seeks by keyset on `(userId, id DESC)` and returns
+in the schema, the service seeks by keyset on `(userId, createdAt DESC, id DESC)`
+— ids are unordered nanoids (ADR 0017), so `createdAt` sorts and `id` breaks
+ties — and returns
 `TodoPage { items, nextCursor }`, and the UI pages with
 `eq.infiniteQueryOptions`. Copy that shape for any list endpoint.
 
@@ -207,8 +209,12 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset
   paginated (ADR 0016), so a client follows `nextCursor` and there is no page
   number and no count. Adding either costs a `COUNT(*)` per request.
-- **List ordering is welded to `id` descending.** Sorting by any other column
-  needs a composite cursor and a matching index (ADR 0016).
+- **List ordering is welded to `createdAt` descending, tie-broken by `id`.**
+  Sorting by any other column needs a different cursor and a matching index
+  (ADR 0016, ADR 0017).
+- **The keyset cursor is only correct at millisecond precision.** `todos.createdAt`
+  is `timestamp(3)` because the cursor encodes a JS `Date`. Widening the column
+  without widening the cursor format repeats a row per page boundary (ADR 0017).
 - **Authenticated throughput is bounded by per-request auth CPU, not by Postgres
   and not by the HTTP layer.** `autocannon` against the container image, authed
   `GET /todos`, session cookie cache warm:
