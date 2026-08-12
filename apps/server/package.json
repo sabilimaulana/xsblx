@@ -16,7 +16,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.7.0-rc.4",
+    "@better-auth/drizzle-adapter": "catalog:auth",
     "@effect/opentelemetry": "catalog:effect",
     "@effect/platform-bun": "catalog:effect",
     "@effect/sql-pg": "catalog:effect",
@@ -31,7 +31,7 @@
     "@opentelemetry/sdk-trace-node": "2.10.0",
     "@opentelemetry/semantic-conventions": "1.43.0",
     "@xsblx/api": "workspace:*",
-    "better-auth": "1.7.0-rc.4",
+    "better-auth": "catalog:auth",
     "drizzle-orm": "1.0.0-rc.4",
     "effect": "catalog:effect"
   },

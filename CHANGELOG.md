@@ -38,6 +38,8 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **`better-auth` and `@better-auth/drizzle-adapter` move to the `auth` catalog.**
+  Bump them in the root `package.json`, not in `apps/server` or `apps/web`.
 - **The `todos` index is `(userId, id DESC)`**, replacing `todos_userId_idx`. It
   serves the keyset seek and the ordering in one access path. Run `db:migrate`.
 - **`Todos.list` takes a page and returns a `TodoPage`.** Callers pass

@@ -17,7 +17,7 @@
     "@tanstack/react-start": "latest",
     "@xsblx/api": "workspace:*",
     "@xsblx/ui": "workspace:*",
-    "better-auth": "1.7.0-rc.4",
+    "better-auth": "catalog:auth",
     "effect": "catalog:effect",
     "effect-query": "1.0.0",
     "lucide-react": "catalog:",
