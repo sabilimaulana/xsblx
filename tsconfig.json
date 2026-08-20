@@ -1,0 +1,20 @@
+{
+  // Covers the one file that lives at the workspace root: the stack. It pulls in
+  // `apps/server/src/worker.ts`, so a broken Worker fails here too.
+  "extends": "./tsconfig.effect.json",
+  "include": ["alchemy.run.ts"],
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["bun", "@cloudflare/workers-types"]
+  }
+}

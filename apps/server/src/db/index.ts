@@ -1,20 +1,20 @@
-import { PgClient } from "@effect/sql-pg";
-import * as PgDrizzle from "drizzle-orm/effect-postgres";
+import type { D1 } from "alchemy/Drizzle/D1";
 import { Context, Effect, Layer } from "effect";
-import { DatabaseConfig } from "../config.ts";
-import { relations } from "./relations.ts";
+import type { relations } from "./relations.ts";
 
 /**
- * Drizzle running on Effect's own Postgres client, so queries are Effects with
- * tracing spans and Effect-native transactions.
+ * Drizzle over the Worker's D1 binding. Queries are Effects failing with
+ * `SqlError`, so services `Effect.orDie` them rather than widening a domain
+ * error channel (ADR 0003).
+ *
+ * There is no self-building `Layer` here, and there cannot be: a D1 binding only
+ * exists inside a Worker. `worker.ts` opens the client in its init phase and
+ * hands it over with `Db.layer(db)`. Services keep depending on this tag and
+ * never on the client, which is what keeps them substitutable.
  */
-export class Drizzle extends Context.Service<
-  Drizzle,
-  Effect.Success<ReturnType<typeof PgDrizzle.makeWithDefaults<typeof relations>>>
->()("server/db/Drizzle") {
-  static readonly layer = Layer.effect(Drizzle, PgDrizzle.makeWithDefaults({ relations }));
+export class Db extends Context.Service<
+  Db,
+  Effect.Success<ReturnType<typeof D1<typeof relations>>>
+>()("server/db/Db") {
+  static readonly layer = (db: Db["Service"]): Layer.Layer<Db> => Layer.succeed(Db)(db);
 }
-
-export const PgLive = PgClient.layerConfig(DatabaseConfig);
-
-export const DrizzleLive = Drizzle.layer.pipe(Layer.provide(PgLive));

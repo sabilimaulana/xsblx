@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 version: 1.0.0
 updated: 2026-08-10
+superseded-by: ./0019-cloudflare-deploy-through-alchemy.md
 ---
 
 # 0014 — One Dockerfile, one compose file, profiles instead of variants

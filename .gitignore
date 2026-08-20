@@ -10,3 +10,6 @@ build/
 
 # Vendored reference sources — fetched by scripts/vendor.sh, never committed.
 repos/
+
+# alchemy state and build caches.
+.alchemy/

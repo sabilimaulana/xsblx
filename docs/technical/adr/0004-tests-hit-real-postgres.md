@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 version: 1.1.0
 updated: 2026-08-10
+superseded-by: ./0020-d1-is-the-database.md
 ---
 
 # 0004 — Tests hit real Postgres

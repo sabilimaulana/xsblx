@@ -28,9 +28,9 @@ export const todoCursor = (todo: { readonly createdAt: Date; readonly id: TodoId
  * Splits a cursor back into its two halves. Safe because `TodoCursor` only
  * exists once the pattern above has matched.
  *
- * `createdAt` stays the ISO string it was encoded as — the only consumer binds
- * it as a `timestamptz` parameter, and a round-trip through `Date` would only
- * add a way to lose precision.
+ * `createdAt` stays the ISO string it was encoded as. The only consumer parses it
+ * to epoch milliseconds — the unit its column stores (ADR 0020) — and keeping the
+ * wire format an instant rather than a number leaves a cursor readable in a log.
  */
 export const todoCursorParts = (cursor: TodoCursor): { createdAt: string; id: TodoId } => {
   const [createdAt, id] = cursor.split("|") as [string, string];

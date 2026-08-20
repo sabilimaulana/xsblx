@@ -3,7 +3,7 @@ import { Todo, TodoId, TodoPage, todoCursor, todoCursorParts } from "@xsblx/api/
 import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { Context, Effect, Layer, Metric } from "effect";
-import { Drizzle, DrizzleLive } from "../../db/index.ts";
+import { Db } from "../../db/index.ts";
 import { todos } from "./schema.ts";
 
 type TodoRow = typeof todos.$inferSelect;
@@ -26,7 +26,7 @@ const toDomain = (row: TodoRow): Todo =>
  * per-call latency, so a metric earns its place only when the question is about
  * a total nobody can answer from a trace (ADR 0015).
  *
- * Nothing exports metrics unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set; declaring
+ * It is exported to Axiom's metrics dataset with the rest (ADR 0023); declaring
  * one is cheap and never fails.
  */
 export const todosCreated = Metric.counter("todos_created_total", {
@@ -65,7 +65,7 @@ export class Todos extends Context.Service<
   static readonly layer = Layer.effect(
     Todos,
     Effect.gen(function* () {
-      const db = yield* Drizzle;
+      const db = yield* Db;
 
       /**
        * Keyset pagination: the cursor is the `(createdAt, id)` sort key of the
@@ -75,9 +75,11 @@ export class Todos extends Context.Service<
        * 500 pages of work and shifts under concurrent inserts.
        *
        * The predicate is a row-wise comparison rather than the `a < x OR (a = x
-       * AND b < y)` expansion: Postgres turns `(a, b) < (x, y)` into a single
-       * index seek, and the expansion is where an off-by-one drops or repeats
-       * the row on the page boundary.
+       * AND b < y)` expansion: SQLite has supported row values since 3.15 and
+       * drives them off the index, and the expansion is where an off-by-one drops
+       * or repeats the row on the page boundary. The cursor's `createdAt` is an
+       * ISO string; the column holds epoch milliseconds, so it is bound as a
+       * number.
        *
        * One row beyond `limit` is fetched to learn whether another page exists
        * without a second `COUNT` query.
@@ -93,7 +95,7 @@ export class Todos extends Context.Service<
               eq(todos.userId, userId),
               after === undefined
                 ? undefined
-                : sql`(${todos.createdAt}, ${todos.id}) < (${after.createdAt}::timestamptz, ${after.id})`,
+                : sql`(${todos.createdAt}, ${todos.id}) < (${Date.parse(after.createdAt)}, ${after.id})`,
               page.status === "all" ? undefined : eq(todos.completed, page.status === "done"),
             ),
           )
@@ -170,5 +172,5 @@ export class Todos extends Context.Service<
 
       return Todos.of({ list, getById, create, update, remove });
     }),
-  ).pipe(Layer.provide(DrizzleLive));
+  );
 }

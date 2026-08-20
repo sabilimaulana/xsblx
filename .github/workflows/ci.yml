@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, cloudflare]
   pull_request:
 
 concurrency:
@@ -13,24 +13,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    # Tests hit a real Postgres (ADR 0004). A throwaway service container is the
-    # whole point of reading DATABASE_URL from .env.test: nothing is shared, so
-    # nothing carries over between runs.
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: xsblx_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    # No service containers: D1 and R2 are Cloudflare's (ADR 0020, ADR 0021), so
+    # nothing here touches a database. The tests that do are `*.e2e.test.ts` —
+    # they deploy a stage and need account credentials, which is `bun run
+    # test:e2e`, not this job.
     steps:
       - uses: actions/checkout@v5
 
@@ -39,24 +25,6 @@ jobs:
           bun-version: "1.3.14"
 
       - run: bun install --frozen-lockfile
-
-      # The avatar tests write real objects (ADR 0018). Started through the one
-      # compose file rather than a `services:` container: the S3 identity file is
-      # written by the seaweedfs entrypoint, which a service container cannot set.
-      - run: |
-          printf 'AUTH_SECRET=ci\nS3_ACCESS_KEY=ci-access-key\nS3_SECRET_KEY=ci-secret-key\n' > .env
-          docker compose up -d --wait seaweedfs
-          docker compose up seaweedfs-init
-
-      # The suite migrates this database itself, so no db:migrate step here.
-      - run: |
-          {
-            echo 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/xsblx_test'
-            echo 'S3_ENDPOINT=http://localhost:8333'
-            echo 'S3_ACCESS_KEY=ci-access-key'
-            echo 'S3_SECRET_KEY=ci-secret-key'
-            echo 'S3_BUCKET=xsblx'
-          } > apps/server/.env.test
 
       - run: bun run typecheck
       - run: bun run lint

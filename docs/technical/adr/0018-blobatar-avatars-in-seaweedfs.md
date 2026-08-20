@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 version: 1.0.0
 updated: 2026-08-20
+superseded-by: ./0021-r2-holds-generated-assets.md
 ---
 
 # 0018 — Generated avatars stored as SVG in SeaweedFS

@@ -1,7 +1,7 @@
 ---
 status: active
-version: 1.2.0
-updated: 2026-08-11
+version: 2.0.0
+updated: 2026-08-20
 ---
 
 # Architecture
@@ -12,27 +12,60 @@ describes what is there.
 
 ## Workspaces
 
-Bun workspace monorepo, TypeScript 7 throughout.
+Bun workspace monorepo, TypeScript 7 throughout. Everything deploys to
+Cloudflare through one alchemy stack (ADR 0019).
 
-| Path           | Stack                                                                               | Dev port |
-| -------------- | ----------------------------------------------------------------------------------- | -------- |
-| `apps/server`  | Effect 4 (beta.103) + `@effect/platform-bun`, `HttpApi`, drizzle + `@effect/sql-pg` | 3000     |
-| `apps/web`     | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                        | 3001     |
-| `packages/api` | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`)      | —        |
-| `packages/ui`  | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`          | —        |
+| Path             | Stack                                                                          | Deploys as                |
+| ---------------- | ------------------------------------------------------------------------------ | ------------------------- |
+| `alchemy.run.ts` | alchemy 2 (beta.70) — the whole deploy as one Effect program                   | the stack itself          |
+| `apps/server`    | Effect 4 (beta.103), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding   | `Cloudflare.Worker`       |
+| `apps/web`       | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                   | `Cloudflare.Website.Vite` |
+| `packages/api`   | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`) | —                         |
+| `packages/ui`    | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`     | —                         |
 
-Scripts live in the root `package.json`: `dev`, `dev:web`, `dev:server`, `build`,
-`typecheck`, `lint`, `format`, `format:check`.
+Scripts live in the root `package.json`: `dev` (`alchemy dev`), `plan`, `deploy`,
+`destroy`, `tail`, `build`, `test`, `test:e2e`, `typecheck`, `lint`, `format`,
+`format:check`. `bun run dev` serves the site on 3001 with HMR and binds it to
+the real cloud resources; there is no separate `dev:server`, because the API
+Worker is part of the same dev session.
 
 Shared dependency versions live in the root `package.json` catalogs, not in each
-workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss),
-`catalog:effect` for `effect`, `@effect/platform-bun`, `@effect/sql-pg` and
-`@effect/vitest`, which must stay on the same beta version (ADR 0002).
+workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss,
+drizzle), `catalog:effect` for `effect`, `@effect/sql-d1`, the platform packages
+and `@effect/vitest`, which must stay on the same beta version (ADR 0002), and
+`catalog:alchemy` for `alchemy` and `@alchemy.run/better-auth`, which move
+together with `repos/alchemy`.
 
-Env vars are per app (`apps/server/.env`, template `apps/server/.env.example`),
-because Bun loads the `.env` in the cwd. There is no repo-root `.env`.
-`apps/server` needs `DATABASE_URL`, `AUTH_URL`, `AUTH_SECRET`,
-`CORS_ALLOWED_ORIGINS`. Observability variables are optional — see below.
+Configuration is one root `.env` (template `.env.example`), because `alchemy` is
+what reads it: a `Config` value resolved in a Worker's init phase is bound onto
+the deployed Worker as a secret. Two variables matter — `AUTH_SECRET` and
+`CORS_ALLOWED_ORIGINS`. Cloudflare credentials are not in it; `alchemy login`
+stores them in `~/.alchemy/profiles.json`, and CI passes
+`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` instead.
+
+## The deploy
+
+```
+alchemy.run.ts                    one stack, "xsblx"
+├── Drizzle.Schema  "Schema"      generates pending migration SQL → apps/server/drizzle/
+├── D1.Database     "Database"    applies it (migrationsTable: drizzle_migrations)
+├── R2.Bucket       "Assets"      public/avatars/<id>.svg
+├── Worker          "Api"         apps/server/src/worker.ts — HttpApi + /api/auth/* + /public/*
+└── Website.Vite    "Website"     apps/web — SSR Worker + static assets, VITE_API_URL = Api.url
+```
+
+The API Worker is public and the browser calls it directly, so CORS with
+credentials is load-bearing (ADR 0008). The website consumes the API's URL as a
+build-time `Output`; the API's allow-list comes from configuration, because taking
+both edges would make the two Workers a cycle in the deploy graph.
+
+| Command           | Does                                                    |
+| ----------------- | ------------------------------------------------------- |
+| `bun run dev`     | Vite dev server + HMR, bindings on real cloud resources |
+| `bun run plan`    | diff the stack against recorded state                   |
+| `bun run deploy`  | generate migrations, apply them, upload both Workers    |
+| `bun run destroy` | remove everything in the stage                          |
+| `bun run tail`    | stream Worker logs                                      |
 
 ## Import paths
 
@@ -55,7 +88,7 @@ the layer is the filename (ADR 0005).
 | Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
 | API definition | `packages/api/src/features/todos/group.ts`       | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
 | API root       | `packages/api/src/api.ts`                        | Composes every group into `Api`.                                                            |
-| Persistence    | `apps/server/src/features/todos/schema.ts`       | Drizzle table. `bun run db:generate` then `db:migrate`.                                     |
+| Persistence    | `apps/server/src/features/todos/schema.ts`       | Drizzle `sqliteTable`. Migrations are generated and applied by `alchemy deploy` (ADR 0020). |
 | Service        | `apps/server/src/features/todos/service.ts`      | `Context.Service` + `Layer`. Owns business rules and SQL; maps rows to domain types.        |
 | Handlers       | `apps/server/src/features/todos/http.ts`         | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
 | Wiring         | `apps/server/src/index.ts`                       | Provides handler layers to the server.                                                      |
@@ -79,117 +112,122 @@ ties — and returns
 `TodoPage { items, nextCursor }`, and the UI pages with
 `eq.infiniteQueryOptions`. Copy that shape for any list endpoint.
 
-Tests live beside the code they test (`src/**/*.test.ts`). No `test/` directory.
+Tests live beside the code they test. No `test/` directory.
 
-`apps/server/src/test-db.ts` and `src/test-setup.ts` are the suite's own
-plumbing, not a feature: `.env.test` supplies `DATABASE_URL`, the real migrations
-run before the suite, and every table is truncated before each test (ADR 0004).
+`bun run test` is vitest and touches no database — what is left off-platform is
+the endpoint contract (`http.test.ts`: defaults, bounds, string parsing).
+Anything that needs rows is an end-to-end test against a deployed stage:
+`*.e2e.test.ts` under `bun run test:e2e`, which deploys the stack with alchemy's
+`Test` harness, drives the real API with the shared typed client, and destroys it
+(ADR 0020). It needs Cloudflare credentials, which is why it is a separate
+script.
 
 ## Auth
 
 Better Auth 1.7.0-rc.4, email + password only. Runs outside the Effect runtime
-and does not follow the slice (ADR 0007).
+and does not follow the slice (ADR 0007), and on a Worker it is a service rather
+than a module singleton (ADR 0022).
 
-| Layer     | File                                            | Responsibility                                                              |
-| --------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| Config    | `apps/server/src/features/auth/auth.ts`         | `betterAuth(...)` + `drizzleAdapter`. Own `drizzle-orm/bun-sql` connection. |
-| Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                 |
-| Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
-| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`.                                    |
-| Avatars   | `apps/server/src/features/auth/avatar.ts`       | Random blobatar SVG per registration, written to object storage (ADR 0018). |
-| Contract  | `packages/api/src/features/auth/middleware.ts`  | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                 |
-| Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
-| Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                |
-| UI        | `apps/web/src/components/auth-form.tsx`         | One form, both modes. Routes `/signin`, `/signup`.                          |
+| Layer     | File                                            | Responsibility                                                                                                             |
+| --------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Service   | `apps/server/src/features/auth/auth.ts`         | `layerBetterAuth` — alchemy's `BetterAuth` tag, built once per isolate inside `Effect.cached` from the D1 and R2 bindings. |
+| Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                                                                |
+| Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.                                                     |
+| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`, plus `GET /public/*` for assets.                                                  |
+| Avatars   | `apps/server/src/features/auth/avatar.ts`       | Random blobatar SVG per registration, written to R2 (ADR 0021).                                                            |
+| Contract  | `packages/api/src/features/auth/middleware.ts`  | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                                                                |
+| Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).                                                              |
+| Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                                                               |
+| UI        | `apps/web/src/components/auth-form.tsx`         | One form, both modes. Routes `/signin`, `/signup`.                                                                         |
 
 ### Regenerating the auth tables
 
-The `auth` CLI runs under node/jiti and cannot import `drizzle-orm/bun-sql`, so
-point it at a throwaway config using `drizzleAdapter({} as never, { provider: "pg" })`,
-generate to a scratch file, then hand-merge the table definitions into
-`src/features/auth/schema.ts`. Drop the generated `relations(...)` block —
+The `auth` CLI runs under node/jiti and cannot import the app's driver, so point
+it at a throwaway config using
+`drizzleAdapter({} as never, { provider: "sqlite" })`, generate to a scratch file,
+then hand-merge the table definitions into `src/features/auth/schema.ts` as
+`sqliteTable`s — booleans are `integer({ mode: "boolean" })`, instants are
+`integer({ mode: "timestamp_ms" })`. Drop the generated `relations(...)` block —
 drizzle 1.0-rc moved that API, and relations live in `src/db/relations.ts` via
 `defineRelations`.
 
 ```
 bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
 # merge tables into src/features/auth/schema.ts, then:
-bun run db:generate && bun run db:migrate
+bun run deploy   # Drizzle.Schema generates the migration, D1 applies it
 ```
 
 ## Object storage
 
-SeaweedFS (`compose.yaml`, service `seaweedfs`) runs master, volume, filer and S3
-gateway in one container and is reached through its S3 API on `:8333`. Not in a
-profile — host development needs it like it needs Postgres.
+One R2 bucket, declared as `Cloudflare.R2.Bucket("Assets")` in
+`apps/server/src/assets.ts` and bound to the API Worker as a `ReadWriteBucket`
+(ADR 0021). alchemy names it per stack, stage and logical id, so every stage has
+its own.
 
-One bucket, `xsblx`, and the prefix is the access rule (ADR 0018):
+| Prefix          | Read path                         | Holds                                     |
+| --------------- | --------------------------------- | ----------------------------------------- |
+| `public/*`      | `GET /public/*` on the API Worker | `public/avatars/<id>.svg` — user avatars  |
+| everything else | none                              | nothing yet; `private/*` is where it goes |
 
-| Prefix          | Who can read it    | Holds                                     |
-| --------------- | ------------------ | ----------------------------------------- |
-| `public/*`      | anyone, unsigned   | `public/avatars/<id>.svg` — user avatars  |
-| everything else | signature required | nothing yet; `private/*` is where it goes |
+The bucket is private: R2 serves anonymous reads only through a custom domain and
+this stack owns no zone, so the Worker streams the object whose key is the request
+path, after matching it against `^public/[A-Za-z0-9][A-Za-z0-9._/-]*$`. That
+pattern is the access rule — the ACL SeaweedFS used to enforce — and responses
+carry `cache-control: public, max-age=31536000, immutable` so the edge absorbs
+repeat reads.
 
-The identity file is written by the container entrypoint from `S3_ACCESS_KEY` and
-`S3_SECRET_KEY`, and `seaweedfs-init` creates the bucket once through
-`weed shell`. Avatars are generated in
-`apps/server/src/features/auth/avatar.ts` — `blobatar` markup uploaded with
-Bun's `S3Client` from Better Auth's user-create hook, outside the Effect runtime
-with the rest of auth (ADR 0007).
-
-`S3_ENDPOINT` is what the server talks to; `S3_PUBLIC_URL` is the origin baked
-into the stored URL, because a browser cannot resolve `seaweedfs`.
-
-Tests that touch the store are `*.bun.test.ts` and run under `bun test` — they
-import the `bun` module, which node cannot resolve.
+Writes happen in Better Auth's `databaseHooks.user.create.before`, outside the
+Effect runtime (ADR 0007), through the binding's `raw` escape hatch — the native
+`R2Bucket` promise API, no S3 client and no credentials. The stored URL is
+absolute, built from `Cloudflare.Worker.URL`, because the web app is a different
+origin.
 
 ## Observability
 
-All three signals come from Effect itself and leave over OTLP/HTTP (ADR 0015).
-Infrastructure, not a slice — there is no `features/observability/`.
+All three signals come from Effect itself and leave over OTLP to Axiom (ADR
+0015, ADR 0023). Both ends are declared in the stack, and there is no SDK to
+initialise — the exporter is a binding layer.
 
-| Piece         | File                                        | Responsibility                                                                     |
-| ------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Config        | `apps/server/src/config.ts`                 | `ObservabilityConfig` — endpoint, service name, log level, log format.             |
-| Layer         | `apps/server/src/observability.ts`          | Logger, minimum level, OTLP span processor and metric reader.                      |
-| Wiring        | `apps/server/src/index.ts`                  | `Layer.provide(ObservabilityLive)` beneath the server layer.                       |
-| Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` spans; `todos_created_total` counter. The copyable pattern. |
+| Piece         | File                                        | Responsibility                                                                        |
+| ------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Datasets      | `apps/server/src/observability.ts`          | One `Axiom.Dataset` per signal, named per stage, plus retention.                      |
+| Credential    | `apps/server/src/observability.ts`          | `Axiom.ApiToken` — `ingest: ["create"]` on those three datasets and nothing else.     |
+| Wiring        | `apps/server/src/worker.ts`                 | `Axiom.Telemetry({ token, traces, logs, metrics, serviceName })` in `Effect.provide`. |
+| Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` spans; `todos_created_total` counter. The copyable pattern.    |
 
 What each signal is:
 
-- **Logs.** `Logger.consoleJson` or `Logger.consolePretty()` by `LOG_FORMAT`,
-  threshold from `LOG_LEVEL`. Written to stdout for a collector to pick up — logs
-  are not pushed over OTLP.
-- **Traces.** `http.span` per request from `HttpApi`, one span per service method
-  from `Effect.fn`. Batched to `${endpoint}/v1/traces`.
-- **Metrics.** Effect's fiber runtime gauges plus declared `Metric`s, pushed to
-  `${endpoint}/v1/metrics` every 60s and on shutdown.
+- **Traces.** An `http.server` root span per request from the runtime, one span
+  per service method from `Effect.fn`, nested under it. Incoming `traceparent` is
+  honoured and Effect's `HttpClient` propagates it onward — which is why
+  `traceparent` and `b3` are in the CORS allow-list (ADR 0008).
+- **Logs.** Every `Effect.log*` record, with the span context attached. Effect's
+  default minimum level (`Info`) applies; there is no `LOG_LEVEL` variable.
+- **Metrics.** Effect's fiber runtime gauges plus declared `Metric`s.
 
-Everything is gated on one variable. With `OTEL_EXPORTER_OTLP_ENDPOINT` unset the
-span processor and metric reader are not installed at all, and the process makes
-no network calls — which is how the repo runs out of the box.
+Building the layer binds each dataset's OTLP endpoint as a plain var and the
+token's `Authorization` header as a **secret** onto the Worker; at runtime the
+exporters are built into each event's request scope and the flush is registered
+with `ctx.waitUntil`, so export happens after the response is sent. Every signal
+also carries `alchemy.stack` and `alchemy.stage` resource attributes, and
+`service.name` is pinned to `xsblx-api` — the default is the Worker's generated
+physical name, which changes per stage.
 
-| Variable                      | Default                |
-| ----------------------------- | ---------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset — export nothing |
-| `OTEL_SERVICE_NAME`           | `xsblx-server`         |
-| `LOG_LEVEL`                   | `Info`                 |
-| `LOG_FORMAT`                  | by `NODE_ENV`          |
+Datasets are `xsblx-<stage>-{traces,logs,metrics}`. Per stage, not shared: a
+`Dataset` is a resource in that stage's state, so one shared name would let
+`alchemy destroy` on a dev stage delete production's events.
 
-A local backend is a compose profile, per ADR 0014. It runs Prometheus, Tempo,
-Loki and Grafana in one container, so a single endpoint takes all three signals —
-a traces-only backend silently 404s the metrics:
+Deploying these resources needs an Axiom credential, which is alchemy's business
+rather than the app's: `alchemy login` reads `AXIOM_TOKEN` (or a stored token)
+alongside the Cloudflare step. The Worker itself only ever carries the
+ingest-only bearer.
 
-```
-docker compose --profile otel up -d   # otel-lgtm: OTLP on :4318, Grafana on :3002
-# then set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-#                          (http://otel:4318 from inside another container)
-```
-
-Two gotchas that cost real time, both recorded in ADR 0015: import
-`@effect/opentelemetry` **by subpath** (the package root re-exports `WebSdk` and
-fails at startup), and keep the SDK layer out of `Layer.mergeAll` (parallel
-construction leaves its own `Resource` unsatisfied — use `Layer.provideMerge`).
+Two things this deliberately does not do. **Nothing alerts** — `Axiom.Monitor` and
+`Axiom.Notifier` are resources this stack does not declare, because a notifier
+needs a destination that is a decision about who gets paged. And **the website
+Worker exports nothing**: `Website.Vite` builds its Worker from Vite output and
+has no init Effect to provide a layer to, so SSR is covered by Cloudflare's own
+Workers Logs (`bun run tail`) and not by a trace.
 
 ## Type-checking: `@effect/tsgo`
 
@@ -219,8 +257,10 @@ reference. In summary: correctness rules and the whole `effect-native` preset ar
 
 Scoped `overrides` exist for code that legitimately runs outside the Effect
 runtime — `**/*.config.ts`, and `**/*.tsx` + `**/routes/**` where React and
-TanStack's `onSubmit` are async by API contract. Auth's three files are exempted
-individually (ADR 0007).
+TanStack's `onSubmit` are async by API contract. Auth's files are exempted
+individually (ADR 0007), and `features/auth/middleware.ts` turns off
+`strictEffectProvide` for the one `RuntimeContext.phantom` provide that erases a
+type rather than building anything (ADR 0022).
 
 ## Tooling
 
@@ -233,72 +273,63 @@ files at pre-commit; hooks install via the root `prepare` script.
 
 ## Known ceilings
 
-- **Avatars are never deleted.** Deleting a user leaves its SVG in the bucket —
-  880 bytes per orphan, with no lifecycle rule and no sweeper (ADR 0018). The
-  answer at volume is a delete hook or a nightly reconcile against `user.image`.
-- **An avatar URL is absolute and embeds the store's public origin.** Moving the
-  store rewrites every stored URL (ADR 0018).
+- **D1 is one SQLite database: single-writer, and capped in size** (10 GB at the
+  time of writing). Writes serialise per database, and read replication is a
+  per-database setting rather than a code change (ADR 0020). Revisit before the
+  first million rows, not after.
+- **There are no interactive transactions.** D1 takes one statement or a batch per
+  round-trip; a Worker cannot hold `BEGIN` open across awaits. Nothing needs one
+  today (ADR 0020).
+- **An avatar read costs a Worker invocation.** The bucket is private, so
+  `GET /public/*` runs the isolate and a subrequest on every cache miss (ADR
+  0021). A custom domain would remove the hop and rewrite every stored URL.
+- **Avatars are never deleted.** Deleting a user leaves its object in R2 — 880
+  bytes per orphan, no lifecycle rule and no sweeper (ADR 0021).
+- **An avatar URL is absolute and embeds the API Worker's origin.** Moving the
+  read path rewrites every stored URL (ADR 0021).
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset
   paginated (ADR 0016), so a client follows `nextCursor` and there is no page
   number and no count. Adding either costs a `COUNT(*)` per request.
 - **List ordering is welded to `createdAt` descending, tie-broken by `id`.**
   Sorting by any other column needs a different cursor and a matching index
   (ADR 0016, ADR 0017).
-- **The keyset cursor is only correct at millisecond precision.** `todos.createdAt`
-  is `timestamp(3)` because the cursor encodes a JS `Date`. Widening the column
-  without widening the cursor format repeats a row per page boundary (ADR 0017).
-- **Authenticated throughput is bounded by per-request auth CPU, not by Postgres
-  and not by the HTTP layer.** `autocannon` against the container image, authed
-  `GET /todos`, session cookie cache warm:
-
-  | Config             | req/s  | Note                          |
-  | ------------------ | ------ | ----------------------------- |
-  | `/health`, no auth | 49,000 | Bun + Effect router + encode  |
-  | `WORKERS=1`        | 5,276  | one core saturated (134% CPU) |
-  | `WORKERS=2`        | 9,907  |                               |
-  | `WORKERS=4`        | 12,050 | peak on a 10-core machine     |
-  | `WORKERS=6`        | 10,950 | contention                    |
-  | `WORKERS=10`       | 6,751  | oversubscribed, worse than 4  |
-
-  Postgres is not the constraint: it sits at **0.09% CPU** under load, and a
-  transaction count shows `/todos` doing ~1 query per request while
-  `/api/auth/get-session` does 2 per _200_ requests once the cookie cache is warm.
-  What remains is Better Auth's own per-request work — routing plus verifying,
-  parsing and validating the signed cookie — which runs outside the Effect runtime
-  (ADR 0007) and is charged to every authenticated route regardless of what the
-  endpoint does.
-
-  Two traps this measurement walked into, both worth avoiding when re-running it.
-  The cookie cache has a **60s `maxAge`**: a bench cookie older than that silently
-  measures the uncached DB path (~3.8k, and flat under worker scaling, because
-  that path _is_ I/O-bound). And **SO_REUSEPORT only load-balances on Linux** —
-  on macOS the kernel hands every connection to one socket, so extra workers idle
-  at 0% CPU and clustering looks like a no-op. Benchmark worker counts in the
-  container, never on the host.
-
-  Next lever, if 12k is ever the constraint: verify the signed cookie inside the
-  Effect middleware and call `auth.api.getSession` only on a cache miss. That
-  reimplements a Better Auth format ADR 0007 deliberately avoids, so it needs its
-  own ADR — and a second datastore for sessions is not the answer.
-
-- **Auth routes produce no spans.** Better Auth runs outside the Effect runtime
-  (ADR 0007), so `/api/auth/*` is invisible in a trace — including the
-  per-request auth CPU that bounds the throughput measured above.
-- **Metrics are per-process, so always aggregate.** Each worker exports its own
-  series, told apart by `service.instance.id` (the pid). A bare
-  `todos_created_total` reads one worker's count; `sum(todos_created_total)` is
-  the real number. Without that attribute the series carry identical labels and
-  silently overwrite each other.
-- **No HTTP request metrics from the app.** Effect's server emits none and
-  `HttpMiddleware` has no metrics member. The local backend derives
-  `traces_spanmetrics_*` from span data instead, which covers request rate and
-  latency without custom middleware — but that is the backend's doing, not the
-  server's, and a different backend may not.
-- **Metrics resolve at 60s** and the reader reads no environment variable, so a
-  finer interval is a code change in `observability.ts`.
+- **Instrumentation is no longer free.** Every span, log record and metric update
+  is serialised and POSTed once per event (ADR 0023). It runs in `ctx.waitUntil`
+  so the response is not delayed, but it is CPU on the Worker's budget and a
+  subrequest per signal. The lever, if it bites, is sampling — not deleting spans.
+- **The website Worker is invisible in a trace**, and so are auth routes: the
+  first has no init Effect to provide the exporter to (ADR 0023), the second runs
+  outside the Effect runtime (ADR 0007).
+- **Nothing alerts, and the ingest bearer lives in resource state.** Monitors are
+  undeclared, and Axiom hands the token over once at create time, so the state
+  store is as sensitive as the token (ADR 0023).
+- **Destroying a stage destroys its telemetry**, including the trace of the run
+  you were reading. `NO_DESTROY=1` keeps an e2e stage alive (ADR 0023).
+- **Debug logging in a deployed stage is a code change.** Effect's default
+  minimum level applies and there is no `LOG_LEVEL` binding (ADR 0023).
+- **Throughput is unmeasured on this branch.** `main`'s numbers — 12k req/s at
+  `WORKERS=4`, bounded by Better Auth's per-request CPU rather than by the
+  database — described a Bun process on one box and say nothing about an isolate
+  per request. The mechanism they identified still applies: authenticated routes
+  pay cookie verification outside the Effect runtime (ADR 0007), and it is
+  charged per request regardless of what the endpoint does. Re-measure before
+  quoting a number, and remember the session cookie cache has a 60s `maxAge` — a
+  stale bench cookie measures the uncached path.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.
-- **Two origins.** CORS is load-bearing (ADR 0008). A single-origin reverse proxy
-  would delete that surface.
-- **Effect is pinned to a beta** on a third-party constraint (ADR 0002).
+- **The session cookie is third-party.** Two Workers on `workers.dev` are
+  different sites, so the cookie is `SameSite=None; Secure` (ADR 0022) — which
+  works in Chrome today, is blocked by Safari's ITP, and is partitioned by
+  Firefox. Auth across the two Workers is therefore not dependable until both sit
+  on one registrable domain.
+- **`CORS_ALLOWED_ORIGINS` is per stage.** A deployed website's `workers.dev`
+  hostname only exists after it deploys, and the API's allow-list cannot consume
+  it without making the two Workers a cycle in the deploy graph (ADR 0019). Every
+  new stage needs its origin added by hand until custom domains land.
+- **Two origins.** CORS is load-bearing (ADR 0008). Routing the API through the
+  website Worker would delete that surface — and add an SSR hop to every call.
+- **Local development needs the cloud.** `alchemy dev` binds real D1 and R2, so
+  there is no offline path and no emulator (ADR 0019).
+- **Effect is pinned to a beta, and now alchemy is too** (ADR 0002, ADR 0019).
+  They move together with the vendored sources in `repos/`.

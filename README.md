@@ -1,24 +1,33 @@
-# xsblx
+# xsblx — Cloudflare
 
-A Bun monorepo running an Effect backend and a TanStack Start frontend against
-Postgres, with the API contract shared between them as Effect `Schema`.
+A Bun monorepo running an Effect backend and a TanStack Start frontend on
+Cloudflare Workers, with the API contract shared between them as Effect `Schema`.
+The whole deploy is one alchemy program (ADR 0019).
+
+> **Branches.** `main` is the VPS deploy — Docker, compose, Postgres, SeaweedFS,
+> Nitro. This branch (`cloudflare`) is the same system on Workers, D1 and R2.
+> They diverge on purpose and are not meant to merge.
 
 ## Stack
 
-| Layer    | Choice                                                            |
-| -------- | ----------------------------------------------------------------- |
-| Runtime  | Bun workspaces                                                    |
-| Backend  | Effect `4.0.0-beta.103`, `@effect/platform-bun`, `@effect/sql-pg` |
-| Database | Postgres via `drizzle-orm` + `drizzle-kit`                        |
-| Auth     | Better Auth (runs outside the Effect runtime — ADR 0007)          |
-| Frontend | TanStack Start / Router / Query / Form, React 19                  |
-| UI       | shadcn components in `packages/ui`, Tailwind 4                    |
-| Contract | `packages/api` — `HttpApi` definition, schemas, domain errors     |
+| Layer     | Choice                                                                |
+| --------- | --------------------------------------------------------------------- |
+| Runtime   | Bun workspaces; Cloudflare Workers in production                      |
+| Infra     | `alchemy` `2.0.0-beta.70` — infrastructure as an Effect program       |
+| Backend   | Effect `4.0.0-beta.103`, `HttpApi`, `@effect/sql-d1` over a binding   |
+| Database  | Cloudflare D1 via `drizzle-orm/sqlite-core` (ADR 0020)                |
+| Storage   | Cloudflare R2, one bucket, `public/*` served by the Worker (ADR 0021) |
+| Auth      | Better Auth as a service on the same D1 (ADR 0007, ADR 0022)          |
+| Telemetry | Axiom — datasets, ingest token and exporter as resources (ADR 0023)   |
+| Frontend  | TanStack Start / Router / Query / Form, React 19                      |
+| UI        | shadcn components in `packages/ui`, Tailwind 4                        |
+| Contract  | `packages/api` — `HttpApi` definition, schemas, domain errors         |
 
 ## Layout
 
 ```
-apps/server     Effect HTTP server, drizzle schema + migrations
+alchemy.run.ts  The stack: D1, R2, Axiom datasets, the API Worker, the website
+apps/server     The API Worker — HttpApi handlers, drizzle schema, auth
 apps/web        TanStack Start app (the only workspace that may depend on vite)
 packages/api    Shared HttpApi definition, schemas, domain errors
 packages/ui     shadcn component library
@@ -34,60 +43,38 @@ is the filename (ADR 0005). `features/todos/` is the reference slice.
 
 ```sh
 bun install
-./scripts/vendor.sh                  # optional: reference sources into repos/
-cp apps/server/.env.example apps/server/.env
-cp apps/web/.env.example apps/web/.env
+./scripts/vendor.sh                  # reference sources into repos/ (effect, alchemy, …)
+cp .env.example .env                 # set AUTH_SECRET
+bun alchemy login                    # Cloudflare, then Axiom — stored in ~/.alchemy
 ```
 
-Fill in `apps/server/.env` — it needs a `DATABASE_URL` pointing at a Postgres
-you can reach, an `AUTH_SECRET`, and the `S3_*` values of the object store that
-holds avatars (ADR 0018). `docker compose up -d` starts both Postgres and
-SeaweedFS; the S3 credentials in the root `.env` are the ones SeaweedFS is
-configured with, so the two files must agree. Then create the schema:
+`alchemy login` walks one step per provider in the stack: Cloudflare (OAuth or an
+API token) and Axiom (`AXIOM_TOKEN` from the environment, or a token entered
+interactively). Neither credential belongs in `.env`.
 
-```sh
-bun run --filter server db:migrate
-```
+`.env` is read by `alchemy`, not by an app: a `Config` value a Worker resolves in
+its init phase is bound onto the deployed Worker as a secret, so `AUTH_SECRET`
+and `CORS_ALLOWED_ORIGINS` live in one file for dev and deploys alike. Cloudflare
+credentials are not in it.
 
-To run the tests, also fill in `apps/server/.env.test` from
-`apps/server/.env.test.example`. It must point at a **separate** database: the
-test run truncates every table before each test (ADR 0004). The tests migrate it
-themselves.
+There is nothing to start locally and no migration to run by hand — D1 and R2 are
+created by the first deploy, and `Drizzle.Schema` generates the migration that
+`alchemy deploy` applies (ADR 0020).
 
 ## Running
 
 ```sh
-bun run dev          # both apps
-bun run dev:web      # web only, port 3001
-bun run dev:server   # server only, port 3000
-
-bun run build        # production build of web → apps/web/dist
-bun run start        # run that build plus the server
-bun run start:web
-bun run start:server
+bun run dev          # alchemy dev: Vite + HMR on :3001, bindings on real resources
+bun run plan         # diff the stack against recorded state
+bun run deploy       # generate migrations, apply them, upload both Workers
+bun run destroy      # remove the stage
+bun run tail         # stream Worker logs
 ```
 
-## Docker
-
-One `Dockerfile` (targets `server` and `web`) and one `compose.yaml`, split by
-profile (ADR 0014). Copy `.env.example` to `.env` first and set `AUTH_SECRET`.
-
-```sh
-docker compose up -d                        # Postgres only — `bun dev` on the host
-docker compose --profile app up -d --build  # the whole stack: db, server, web
-docker compose --profile app down -v        # and throw the data away
-```
-
-The `app` profile runs migrations as a one-shot `migrate` service before the
-server starts. `VITE_API_URL` is compiled into the client bundle, so changing
-the API origin means rebuilding the `web` image, not restarting it.
-
-Ports come from `PORT` in each app's `.env` (`apps/web` 3001, `apps/server` 3000) and apply to `dev` and `start` alike — change the env, not a script. The
-database commands are `bun run db:generate | db:migrate | db:push | db:pull |
-db:check | db:up | db:studio`.
-
-The web app expects the server at the origin listed in `CORS_ALLOWED_ORIGINS`;
-CORS must keep `credentials: true` for the session cookie to survive (ADR 0008).
+`alchemy dev` binds the **real** D1 database and R2 bucket, so there is no
+emulator to disagree with production — and no offline path. Stages keep that
+honest: `--stage <name>` gets its own database, bucket and Workers, and the
+default is `dev_$USER`.
 
 ## Checks
 
@@ -95,12 +82,14 @@ CORS must keep `credentials: true` for the session cookie to survive (ADR 0008).
 bun run typecheck    # tsc + Effect diagnostics — treat TS377001 etc. as errors
 bun run lint
 bun run format:check
-bun run test         # server tests, against a real Postgres (ADR 0004)
+bun run test         # vitest: contract tests, no database
+bun run test:e2e     # deploys the stack to a stage and drives the real API
 ```
 
-These four are exactly what CI runs (`.github/workflows/ci.yml`) on every push to
-`main` and every PR, with Postgres as a service container. Lefthook runs format
-and lint on staged files at commit time; CI is what covers the whole repo.
+The first four are what CI runs (`.github/workflows/ci.yml`) on every push and
+PR; they need no cloud account. `test:e2e` does — it deploys, asserts, and
+destroys (ADR 0020) — so it stays out of CI until the branch has credentials.
+Lefthook runs format and lint on staged files at commit time.
 
 ## Contributing
 

@@ -141,23 +141,20 @@
           },
           {
             // Avatar generation is part of auth: it runs inside a Better Auth
-            // database hook, outside the Effect runtime, against Bun's own S3
-            // client. `globalFetch` is relaxed for the test only, which reads the
-            // stored object back the way a browser does.
-            "include": ["**/features/auth/avatar.ts", "**/features/auth/avatar.bun.test.ts"],
+            // database hook, outside the Effect runtime, against the native R2
+            // binding's promise API.
+            "include": ["**/features/auth/avatar.ts"],
             "options": {
               "diagnosticSeverity": {
-                "processEnv": "off",
-                "asyncFunction": "off",
-                "globalFetch": "off"
+                "asyncFunction": "off"
               }
             }
           },
           {
-            // `workerCount` is read before the Effect runtime exists — the
-            // primary forks on it, so it cannot come from a `Config`. Only
-            // `processEnv` is relaxed; the rest of the file is normal Effect.
-            "include": ["**/src/config.ts"],
+            // An end-to-end test drives the deploy itself, so it reads the same
+            // switches the CLI does — `NO_DESTROY=1` keeps the stage up — before
+            // any runtime exists to resolve a `Config` against.
+            "include": ["**/*.e2e.test.ts"],
             "options": {
               "diagnosticSeverity": {
                 "processEnv": "off"
@@ -165,19 +162,19 @@
             }
           },
           {
-            // The Nitro access-log plugin runs in the frontend server, outside
-            // the Effect runtime — there is no configured logger to reach.
-            "include": ["**/src/access-log.ts"],
-            "options": {
-              "diagnosticSeverity": {
-                "globalConsole": "off"
-              }
-            }
-          },
-          {
             // Entry points are the one place a Layer is provided — which is
             // what strictEffectProvide exists to keep out of everywhere else.
-            "include": ["**/src/migrate.ts", "**/src/main.ts", "**/src/index.ts"],
+            // `features/auth/middleware.ts` is not an entry point: it provides
+            // `RuntimeContext.phantom`, an empty layer whose only job is to erase
+            // a type-level requirement alchemy's lazy bindings carry (ADR 0022).
+            // Nothing is built and no scope is created, so the lifetime hazard the
+            // rule guards against cannot arise.
+            "include": [
+              "**/src/worker.ts",
+              "**/src/main.ts",
+              "**/src/index.ts",
+              "**/features/auth/middleware.ts"
+            ],
             "options": {
               "diagnosticSeverity": {
                 "strictEffectProvide": "off"

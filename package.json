@@ -7,9 +7,12 @@
       "packages/*"
     ],
     "catalog": {
+      "@cloudflare/workers-types": "^4.20250805.0",
       "@types/node": "^22.10.2",
       "@types/react": "^19.2.0",
       "@types/react-dom": "^19.2.0",
+      "drizzle-kit": "1.0.0-rc.4",
+      "drizzle-orm": "1.0.0-rc.4",
       "lucide-react": "^1.30.0",
       "react": "^19.2.0",
       "react-dom": "^19.2.0",
@@ -18,14 +21,18 @@
       "vite": "^8.0.0"
     },
     "catalogs": {
+      "alchemy": {
+        "@alchemy.run/better-auth": "2.0.0-beta.70",
+        "alchemy": "2.0.0-beta.70"
+      },
       "auth": {
         "@better-auth/drizzle-adapter": "1.7.0-rc.4",
         "better-auth": "1.7.0-rc.4"
       },
       "effect": {
-        "@effect/opentelemetry": "4.0.0-beta.103",
         "@effect/platform-bun": "4.0.0-beta.103",
-        "@effect/sql-pg": "4.0.0-beta.103",
+        "@effect/platform-node": "4.0.0-beta.103",
+        "@effect/sql-d1": "4.0.0-beta.103",
         "@effect/vitest": "4.0.0-beta.103",
         "effect": "4.0.0-beta.103"
       }
@@ -33,29 +40,28 @@
   },
   "scripts": {
     "prepare": "lefthook install && effect-tsgo patch --typescript --no-oxlint",
-    "dev": "bun run --filter '*' dev",
-    "dev:web": "bun run --filter web dev",
-    "dev:server": "bun run --filter server dev",
+    "dev": "alchemy dev",
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy",
+    "plan": "alchemy plan",
+    "tail": "alchemy tail",
     "build": "bun run --filter web build",
-    "start": "bun run --filter '*' start",
-    "start:web": "bun run --filter web start",
-    "start:server": "bun run --filter server start",
-    "start:docker": "docker compose --profile app up -d --build",
-    "db:generate": "bun run --filter server db:generate",
-    "db:migrate": "bun run --filter server db:migrate",
-    "db:push": "bun run --filter server db:push",
-    "db:pull": "bun run --filter server db:pull",
-    "db:check": "bun run --filter server db:check",
-    "db:up": "bun run --filter server db:up",
-    "db:studio": "bun run --filter server db:studio",
     "test": "bun run --filter '*' test",
-    "typecheck": "bun run --filter '*' typecheck",
+    "test:e2e": "bun run --filter server test:e2e",
+    "typecheck": "tsc --noEmit && bun run --filter '*' typecheck",
     "lint": "oxlint --disable-nested-config",
     "format": "oxfmt --disable-nested-config",
     "format:check": "oxfmt --check --disable-nested-config"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@effect/platform-bun": "catalog:effect",
+    "@effect/platform-node": "catalog:effect",
     "@effect/tsgo": "0.36.0",
+    "@types/bun": "latest",
+    "alchemy": "catalog:alchemy",
+    "drizzle-kit": "catalog:",
+    "effect": "catalog:effect",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.77.0",
