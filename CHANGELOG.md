@@ -11,6 +11,14 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **Every account gets a randomly generated avatar at registration** — a
+  `blobatar` SVG written to SeaweedFS under `public/avatars/<id>.svg`, with the
+  URL stored in `user.image` and rendered next to the email in the todos header.
+  `docker compose up -d` now brings up the object store alongside Postgres, and
+  `.env` gains `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_PORT` and
+  `S3_PUBLIC_URL`. Tests that write real objects are `*.bun.test.ts` and run
+  under `bun test`. See ADR 0018.
+
 - **The web server logs one access line per request** —
   `METHOD path?query status duration` — from a Nitro plugin
   (`apps/web/src/access-log.ts`), in dev and in the `.output/` build. Static

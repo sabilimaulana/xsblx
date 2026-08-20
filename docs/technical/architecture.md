@@ -96,6 +96,7 @@ and does not follow the slice (ADR 0007).
 | Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                 |
 | Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.      |
 | Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`.                                    |
+| Avatars   | `apps/server/src/features/auth/avatar.ts`       | Random blobatar SVG per registration, written to object storage (ADR 0018). |
 | Contract  | `packages/api/src/features/auth/middleware.ts`  | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                 |
 | Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).               |
 | Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                |
@@ -115,6 +116,32 @@ bunx auth@1.7.0-rc.4 generate --config src/auth.gen.ts --output /tmp/auth-schema
 # merge tables into src/features/auth/schema.ts, then:
 bun run db:generate && bun run db:migrate
 ```
+
+## Object storage
+
+SeaweedFS (`compose.yaml`, service `seaweedfs`) runs master, volume, filer and S3
+gateway in one container and is reached through its S3 API on `:8333`. Not in a
+profile — host development needs it like it needs Postgres.
+
+One bucket, `xsblx`, and the prefix is the access rule (ADR 0018):
+
+| Prefix          | Who can read it    | Holds                                     |
+| --------------- | ------------------ | ----------------------------------------- |
+| `public/*`      | anyone, unsigned   | `public/avatars/<id>.svg` — user avatars  |
+| everything else | signature required | nothing yet; `private/*` is where it goes |
+
+The identity file is written by the container entrypoint from `S3_ACCESS_KEY` and
+`S3_SECRET_KEY`, and `seaweedfs-init` creates the bucket once through
+`weed shell`. Avatars are generated in
+`apps/server/src/features/auth/avatar.ts` — `blobatar` markup uploaded with
+Bun's `S3Client` from Better Auth's user-create hook, outside the Effect runtime
+with the rest of auth (ADR 0007).
+
+`S3_ENDPOINT` is what the server talks to; `S3_PUBLIC_URL` is the origin baked
+into the stored URL, because a browser cannot resolve `seaweedfs`.
+
+Tests that touch the store are `*.bun.test.ts` and run under `bun test` — they
+import the `bun` module, which node cannot resolve.
 
 ## Observability
 
@@ -206,6 +233,11 @@ files at pre-commit; hooks install via the root `prepare` script.
 
 ## Known ceilings
 
+- **Avatars are never deleted.** Deleting a user leaves its SVG in the bucket —
+  880 bytes per orphan, with no lifecycle rule and no sweeper (ADR 0018). The
+  answer at volume is a delete hook or a nightly reconcile against `user.image`.
+- **An avatar URL is absolute and embeds the store's public origin.** Moving the
+  store rewrites every stored URL (ADR 0018).
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset
   paginated (ADR 0016), so a client follows `nextCursor` and there is no page
   number and no count. Adding either costs a `COUNT(*)` per request.

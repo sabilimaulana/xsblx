@@ -69,10 +69,3 @@ export const ObservabilityConfig = Config.all({
 export const DatabaseConfig = Config.all({
   url: Config.redacted("DATABASE_URL"),
 });
-
-export const S3Config = Config.all({
-  endpoint: Config.nonEmptyString("S3_ENDPOINT"),
-  accessKey: Config.redacted("S3_ACCESS_KEY"),
-  secretKey: Config.redacted("S3_SECRET_KEY"),
-  bucket: Config.nonEmptyString("S3_BUCKET"),
-});

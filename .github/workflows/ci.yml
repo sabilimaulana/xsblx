@@ -40,8 +40,23 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # The avatar tests write real objects (ADR 0018). Started through the one
+      # compose file rather than a `services:` container: the S3 identity file is
+      # written by the seaweedfs entrypoint, which a service container cannot set.
+      - run: |
+          printf 'AUTH_SECRET=ci\nS3_ACCESS_KEY=ci-access-key\nS3_SECRET_KEY=ci-secret-key\n' > .env
+          docker compose up -d --wait seaweedfs
+          docker compose up seaweedfs-init
+
       # The suite migrates this database itself, so no db:migrate step here.
-      - run: echo 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/xsblx_test' > apps/server/.env.test
+      - run: |
+          {
+            echo 'DATABASE_URL=postgres://postgres:postgres@localhost:5432/xsblx_test'
+            echo 'S3_ENDPOINT=http://localhost:8333'
+            echo 'S3_ACCESS_KEY=ci-access-key'
+            echo 'S3_SECRET_KEY=ci-secret-key'
+            echo 'S3_BUCKET=xsblx'
+          } > apps/server/.env.test
 
       - run: bun run typecheck
       - run: bun run lint

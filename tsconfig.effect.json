@@ -140,6 +140,20 @@
             }
           },
           {
+            // Avatar generation is part of auth: it runs inside a Better Auth
+            // database hook, outside the Effect runtime, against Bun's own S3
+            // client. `globalFetch` is relaxed for the test only, which reads the
+            // stored object back the way a browser does.
+            "include": ["**/features/auth/avatar.ts", "**/features/auth/avatar.bun.test.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "processEnv": "off",
+                "asyncFunction": "off",
+                "globalFetch": "off"
+              }
+            }
+          },
+          {
             // `workerCount` is read before the Effect runtime exists — the
             // primary forks on it, so it cannot come from a `Config`. Only
             // `processEnv` is relaxed; the rest of the file is normal Effect.

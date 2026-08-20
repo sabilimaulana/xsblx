@@ -98,7 +98,14 @@ function Todos() {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4 p-8">
       <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-sm">{session?.user.email}</span>
+        <div className="flex items-center gap-2">
+          {/* Assigned at registration and served straight from the object store
+              (ADR 0018), so there is nothing to generate or cache here. */}
+          {session?.user.image ? (
+            <img src={session.user.image} alt="" className="size-8 rounded-full" />
+          ) : null}
+          <span className="text-muted-foreground text-sm">{session?.user.email}</span>
+        </div>
         <Button variant="ghost" size="sm" onClick={() => void signOut()}>
           Sign out
         </Button>

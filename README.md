@@ -40,7 +40,10 @@ cp apps/web/.env.example apps/web/.env
 ```
 
 Fill in `apps/server/.env` — it needs a `DATABASE_URL` pointing at a Postgres
-you can reach, an `AUTH_SECRET`, and S3 credentials. Then create the schema:
+you can reach, an `AUTH_SECRET`, and the `S3_*` values of the object store that
+holds avatars (ADR 0018). `docker compose up -d` starts both Postgres and
+SeaweedFS; the S3 credentials in the root `.env` are the ones SeaweedFS is
+configured with, so the two files must agree. Then create the schema:
 
 ```sh
 bun run --filter server db:migrate

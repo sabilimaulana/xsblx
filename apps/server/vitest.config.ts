@@ -13,6 +13,9 @@ process.loadEnvFile(fileURLToPath(new URL(".env.test", import.meta.url)));
 export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
+    // `*.bun.test.ts` imports the `bun` module, which node cannot resolve. Those
+    // run under `bun test` — see the `test` script.
+    exclude: ["src/**/*.bun.test.ts"],
     setupFiles: ["./src/test-setup.ts"],
     // One shared test database, so files take turns. See the note in test-setup.ts.
     fileParallelism: false,

@@ -2,6 +2,7 @@ import { MIN_PASSWORD_LENGTH } from "@xsblx/api/auth/credentials";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/bun-sql";
+import { createAvatar } from "./avatar.ts";
 import { newId } from "../../id.ts";
 import * as authSchema from "./schema.ts";
 
@@ -27,6 +28,19 @@ export const auth = betterAuth({
    * id and a todo id are told apart by their column, not their format.
    */
   advanced: { database: { generateId: () => newId() } },
+  /**
+   * Every account gets a random blobatar at registration, written to the object
+   * store as SVG (ADR 0018). `before` rather than `after`: the URL is part of the
+   * row that is inserted, so there is no window where a user has no avatar and no
+   * second write to fail halfway.
+   */
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => ({ data: { ...user, image: await createAvatar() } }),
+      },
+    },
+  },
   /**
    * Every authenticated request otherwise costs a session lookup, which caps the
    * whole API around 5k req/s regardless of what the endpoint does (see

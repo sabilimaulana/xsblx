@@ -193,6 +193,22 @@ Better Auth runs **outside** the Effect runtime and does not follow the slice
   `docs/technical/architecture.md#regenerating-the-auth-tables`; the CLI cannot
   import `drizzle-orm/bun-sql`.
 
+## Object storage
+
+**Generated avatars and every other user-facing asset live in SeaweedFS under
+`public/*`, and the URL is stored on the row** (ADR 0018).
+
+- **`public/*` is world-readable, everything else needs a signature.** The
+  anonymous grant is `Read:<bucket>/public/*` — drop the `*` and SeaweedFS grants
+  nothing while looking like it granted the prefix.
+- **Upload through Bun's `S3Client`.** Never add an AWS SDK; never add a second
+  bucket. A new kind of asset is a new prefix.
+- **Credentials come from `.env` and are written into the store's identity file
+  by the compose entrypoint.** There is no second config file to edit.
+- **A `*.bun.test.ts` file runs under `bun test`, not vitest** — vitest runs on
+  node, which cannot resolve the `bun` module. It is excluded from the vitest
+  include on purpose.
+
 ## Vendored repositories
 
 `repos/` holds pinned third-party source fetched by `./scripts/vendor.sh`, which
