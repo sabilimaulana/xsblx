@@ -21,6 +21,20 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 - **`.env` at the repo root** — read by `alchemy`, holding `AUTH_SECRET` and
   `CORS_ALLOWED_ORIGINS`. A `Config` resolved in a Worker's init phase is bound
   onto the deployed Worker as a secret, so one file covers dev and deploys.
+- **Custom domains, set per stage.** `WEB_DOMAIN` and `API_DOMAIN` name the
+  hostnames a stage's Workers serve on; unset leaves custom domains unmanaged and
+  the Worker on `workers.dev`. `prod` serves the website at `x.sblsblsbl.club`
+  and the API at `api.x.sblsblsbl.club` — Cloudflare provisions the DNS record
+  and the certificate, and `VITE_API_URL` follows the API's `url` output with
+  nothing to update by hand. See
+  [ADR 0024](docs/technical/adr/0024-custom-domains-make-the-session-cookie-first-party.md).
+- **`bun run deploy:prod`** — deploys the `prod` stage with
+  `--env-file .env.prod.local` (gitignored), which supplies a prod-only
+  `AUTH_SECRET` and a `CORS_ALLOWED_ORIGINS` holding just the prod website
+  Worker. It sources `.env` into the environment first, because alchemy resolves
+  the dotenv file ahead of the environment and falls back to it — so Axiom
+  credentials still come from `.env` while those two values are overridden.
+  Exporting the variables alone does **not** override `.env`.
 - **Telemetry ships to Axiom.** `apps/server/src/observability.ts` declares one
   dataset per signal (`xsblx-<stage>-traces|logs|metrics`, 30-day retention)
   plus an ingest-only API token, and the API Worker provides
@@ -37,6 +51,11 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **The session cookie's `SameSite` is configuration, not a constant.**
+  `SESSION_COOKIE_SAMESITE` selects `lax` or `none` and defaults to `none`;
+  `prod` sets `lax`, because its two hostnames share a registrable domain and are
+  therefore same-site. The cookie stays `Secure` and host-only under both. See
+  [ADR 0024](docs/technical/adr/0024-custom-domains-make-the-session-cookie-first-party.md).
 - **The database is Cloudflare D1, and the schema is `drizzle-orm/sqlite-core`.**
   Booleans are `integer({ mode: "boolean" })`, instants are
   `integer({ mode: "timestamp_ms" })`, and `todos.createdAt` defaults to SQLite's

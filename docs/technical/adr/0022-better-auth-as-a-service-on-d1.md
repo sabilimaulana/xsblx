@@ -1,7 +1,8 @@
 ---
 status: accepted
-version: 1.0.0
+version: 1.1.0
 updated: 2026-08-20
+amended-by: ./0024-custom-domains-make-the-session-cookie-first-party.md
 ---
 
 # 0022 — Better Auth becomes a service, over the app's own D1 database

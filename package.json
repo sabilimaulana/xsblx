@@ -42,6 +42,7 @@
     "prepare": "lefthook install && effect-tsgo patch --typescript --no-oxlint",
     "dev": "alchemy dev",
     "deploy": "alchemy deploy",
+    "deploy:prod": "set -a && . ./.env && set +a && alchemy deploy --stage prod --env-file .env.prod.local",
     "destroy": "alchemy destroy",
     "plan": "alchemy plan",
     "tail": "alchemy tail",

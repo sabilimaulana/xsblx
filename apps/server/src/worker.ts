@@ -9,7 +9,7 @@ import { Effect, Layer, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Assets } from "./assets.ts";
-import { CorsConfig } from "./config.ts";
+import { ApiDomainConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
@@ -51,7 +51,10 @@ const HttpPlatformStub = Layer.succeed(HttpPlatform.HttpPlatform)({
  */
 export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   "Api",
-  { main: import.meta.url },
+  // A prop takes a `Config` directly, so the hostname is configuration rather
+  // than a literal: a stage that names one serves on it and reports it as `url`,
+  // and a stage that does not leaves custom domains unmanaged (ADR 0024).
+  { main: import.meta.url, domain: ApiDomainConfig },
   Effect.gen(function* () {
     const cors = yield* CorsConfig;
     const database = yield* Database;

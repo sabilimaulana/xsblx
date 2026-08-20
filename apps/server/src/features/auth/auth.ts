@@ -7,6 +7,7 @@ import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/d1";
 import { Config, Effect, Redacted } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { SessionCookieConfig } from "../../config.ts";
 import { newId } from "../../id.ts";
 import { createAvatar } from "./avatar.ts";
 import * as authSchema from "./schema.ts";
@@ -41,6 +42,7 @@ export const makeBetterAuth = (
     // Resolved in the init phase so alchemy binds it as a secret on the Worker;
     // a `Config` first read inside a handler is never discovered and never bound.
     const secret = yield* Config.redacted("AUTH_SECRET");
+    const sessionCookie = yield* SessionCookieConfig;
 
     const instance = yield* Effect.cached(
       Effect.gen(function* () {
@@ -72,21 +74,30 @@ export const makeBetterAuth = (
              */
             database: { generateId: () => newId() },
             /**
-             * The API and the website are separate Workers, and `workers.dev` is
-             * on the Public Suffix List — so the two hostnames are different
-             * *sites*, not merely different origins (ADR 0008). A `SameSite=Lax`
-             * cookie is never sent on a cross-site request, which leaves every
-             * sign-in succeeding and every call after it anonymous.
+             * `SameSite` follows the stage's hostnames, and only the stage knows
+             * them (ADR 0024).
              *
-             * `None` requires `Secure`, which the deployed Workers are; browsers
-             * treat `http://localhost` as trustworthy, so dev behaves the same.
+             * On `workers.dev` the two Workers are different *sites*, not merely
+             * different origins (ADR 0008) — it is on the Public Suffix List — so
+             * the cookie has to be `None` or it is silently dropped on every
+             * cross-site request, leaving sign-in a 200 and everything after it
+             * anonymous. The cost is a third-party cookie, which Safari's ITP
+             * blocks and Firefox partitions by default.
              *
-             * The real fix is a shared registrable domain (`api.example.com` +
-             * `app.example.com`), which makes the cookie first-party again — a
-             * third-party cookie is blocked outright by Safari's ITP and by
-             * Firefox's default partitioning. Recorded as a ceiling.
+             * A stage that puts both Workers under one registrable domain
+             * (`x.sblsblsbl.club` + `api.x.sblsblsbl.club`) is same-site, so it
+             * sets `lax` and the cookie is first-party again — sent on the
+             * website's own fetches, withheld from anyone else's. That is the
+             * CSRF protection `None` gives up.
+             *
+             * No `domain` attribute either way: the cookie stays host-only to the
+             * API, rather than being readable by every sibling hostname in the
+             * zone.
+             *
+             * `Secure` is unconditional. Browsers treat `http://localhost` as
+             * trustworthy, so dev is unaffected.
              */
-            defaultCookieAttributes: { sameSite: "none", secure: true },
+            defaultCookieAttributes: { sameSite: sessionCookie.sameSite, secure: true },
           },
           /**
            * Every account gets a random blobatar at registration, written to R2

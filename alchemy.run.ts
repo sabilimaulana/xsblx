@@ -4,6 +4,7 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
 import { Effect, Layer } from "effect";
 import { fileURLToPath } from "node:url";
+import { WebDomainConfig } from "./apps/server/src/config.ts";
 import { Database } from "./apps/server/src/db/database.ts";
 import ApiWorker from "./apps/server/src/worker.ts";
 
@@ -39,6 +40,9 @@ export default Alchemy.Stack(
 
     const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: fileURLToPath(new URL("./apps/web", import.meta.url)),
+      // The hostname this stage serves on, or nothing — in which case alchemy
+      // leaves custom domains unmanaged and `workers.dev` stands (ADR 0024).
+      domain: WebDomainConfig,
       // `VITE_`-prefixed, so the API origin is inlined into the client bundle at
       // build time — the browser talks to the API Worker directly.
       env: { VITE_API_URL: api.url.as<string>() },

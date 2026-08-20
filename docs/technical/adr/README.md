@@ -42,7 +42,9 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0019 | [Cloudflare is the deploy target, via alchemy](./0019-cloudflare-deploy-through-alchemy.md)                | accepted, amended by 0023          |
 | 0020 | [D1 is the database](./0020-d1-is-the-database.md)                                                         | accepted                           |
 | 0021 | [R2 holds generated assets](./0021-r2-holds-generated-assets.md)                                           | accepted                           |
-| 0022 | [Better Auth becomes a service on D1](./0022-better-auth-as-a-service-on-d1.md)                            | accepted                           |
+| 0022 | [Better Auth becomes a service on D1](./0022-better-auth-as-a-service-on-d1.md)                            | accepted, amended by 0024          |
+| 0023 | [Axiom is the telemetry sink](./0023-axiom-is-the-telemetry-sink.md)                                       | accepted                           |
+| 0024 | [Custom domains, first-party session cookie](./0024-custom-domains-make-the-session-cookie-first-party.md) | accepted                           |
 
 Template:
 

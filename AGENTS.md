@@ -188,6 +188,21 @@ pointed at the real cloud resources.
 
 - **A resource is declared once, where it is used, and bound with one `yield*`.**
   Never write a `wrangler.jsonc`, a `wrangler.toml` or a second stack file.
+- **A per-stage value is a `Config` on the prop and a line in
+  `.env.<stage>.local`, passed with `--env-file`** (ADR 0024) — that is how
+  `prod` gets hostnames and a cookie policy the other stages do not. A prop takes
+  a `Config` directly, so it needs no `Effect`; the three-argument class form of
+  `Cloudflare.Worker` rejects one anyway. Never branch on the stage name in code,
+  and never add a second stack file for an environment.
+- **Exporting a variable does not override `.env`.** alchemy resolves the dotenv
+  file _ahead of_ the environment (`ConfigProvider.orElse(dotEnv, fromEnv())`),
+  so a shell export loses to `.env` every time. Override with `--env-file`, whose
+  own misses still fall back to the environment.
+- **A changed secret value is a no-op to the differ.** Rebinding one takes
+  `--force`; without it `alchemy deploy` reports 9 noops and leaves the old
+  value bound.
+- **Hostnames are never derived from the stage name.** The default stage is
+  `dev_$USER`, and an underscore is not legal in a hostname (ADR 0024).
 - **`alchemy` is pinned to `2.0.0-beta.70` — the tag `scripts/vendor.sh` fetches.**
   Bump the dependency and the vendored source together, never one alone, the way
   `effect` and `repos/effect` already move.
@@ -240,11 +255,13 @@ Read both before touching auth. Rules that are load-bearing:
   `set-cookie` with `getSetCookie()`. Flattening headers into a record merges
   multiple cookies into one broken one.
 - **Credential rules live once**, in `packages/api/src/features/auth/credentials.ts`.
-- **Session cookies are `SameSite=None; Secure` and must stay that way** (ADR
-  0022). The API and the website are separate Workers and `workers.dev` is a
-  public suffix, so they are different _sites_: a `Lax` cookie is silently never
-  sent, and every request after a successful sign-in is anonymous. Only a shared
-  registrable domain makes `Lax` correct again.
+- **Session cookies are always `Secure`, and their `SameSite` comes from
+  `SESSION_COOKIE_SAMESITE`** (ADR 0024). Never hard-code the value back. `lax`
+  is only correct when that stage's two hostnames share a registrable domain;
+  the default `none` is what a stage on `workers.dev` needs, because a public
+  suffix makes the two Workers different _sites_ and a `Lax` cookie is then
+  silently never sent — sign-in succeeds and every later request is anonymous.
+  Never add a `Domain` attribute: the cookie stays host-only to the API.
 - **The API is closed, not just the UI.** Handlers take the owner id from
   `CurrentUser`, never from a payload. Every query filters by `userId`, and
   another user's row surfaces as `TodoNotFound`, never a 403 — a 403 confirms the
