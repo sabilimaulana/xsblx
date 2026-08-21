@@ -153,7 +153,7 @@ error, no warning. If that symptom appears:
 A second Dockerfile or a `compose.prod.yml` is a wrong turn — a new service goes
 in a profile.
 
-- **Bun is pinned to `1.3.14` in the image and in CI.** Bump both together.
+- **Bun is pinned to `1.4.0` in the image and in CI.** Bump both together.
 - **The server's runtime install deletes `bun.lock`, the web/ui manifests and the
   devDependencies, and uses `--linker hoisted`.** Every part of that is
   load-bearing; read ADR 0014 before simplifying it back to `bun install`.

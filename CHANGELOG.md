@@ -50,6 +50,10 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **Bun is 1.4.0** — in the Docker image (`oven/bun:1.4.0-alpine`), in CI
+  (`setup-bun`) and in `@types/bun`. See
+  [ADR 0014](docs/technical/adr/0014-one-dockerfile-one-compose-file.md).
+
 - **Every id is now a 21-character nanoid over `0-9A-Za-z`.** `todos.id` is text
   instead of a serial integer, and Better Auth mints user, session and account
   ids through the same generator. `-` and `_` are excluded from the alphabet.

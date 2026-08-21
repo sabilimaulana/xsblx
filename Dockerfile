@@ -1,6 +1,6 @@
 # Two images out of one file: `--target server` and `--target web`.
 # Alpine keeps the runtime layer small; the bun version matches CI (ADR 0014).
-FROM oven/bun:1.3.14-alpine AS base
+FROM oven/bun:1.4.0-alpine AS base
 WORKDIR /app
 
 # Manifests only, so a source edit does not re-run the install.
