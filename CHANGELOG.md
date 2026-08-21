@@ -51,6 +51,9 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Bun is 1.4.0** — in CI (`setup-bun`) and in `@types/bun`. The re-resolve also
+  drops the `pg` and `crossws` entries the lockfile still carried from before D1.
+
 - **The session cookie's `SameSite` is configuration, not a constant.**
   `SESSION_COOKIE_SAMESITE` selects `lax` or `none` and defaults to `none`;
   `prod` sets `lax`, because its two hostnames share a registrable domain and are
