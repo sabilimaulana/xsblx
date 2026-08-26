@@ -32,18 +32,20 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
   `--env-file .env.prod.local` (gitignored), which supplies a prod-only
   `AUTH_SECRET` and a `CORS_ALLOWED_ORIGINS` holding just the prod website
   Worker. It sources `.env` into the environment first, because alchemy resolves
-  the dotenv file ahead of the environment and falls back to it — so Axiom
+  the dotenv file ahead of the environment and falls back to it — so Cloudflare
   credentials still come from `.env` while those two values are overridden.
   Exporting the variables alone does **not** override `.env`.
-- **Telemetry ships to Axiom.** `apps/server/src/observability.ts` declares one
-  dataset per signal (`xsblx-<stage>-traces|logs|metrics`, 30-day retention)
-  plus an ingest-only API token, and the API Worker provides
-  `Axiom.Telemetry` — so every `Effect.fn` span, `Effect.log*` record and `Metric`
-  update is exported, flushed after the response through `ctx.waitUntil`.
-  `service.name` is `xsblx-api`; `alchemy login` gains an Axiom step
-  (`AXIOM_TOKEN` in CI). Nothing alerts yet, and the website Worker is not
-  instrumented. See
-  [ADR 0023](docs/technical/adr/0023-axiom-is-the-telemetry-sink.md).
+- **Observability is Cloudflare's, on both Workers.** The `observability` literal
+  in `apps/server/src/config.ts` turns on Workers Logs, invocation logs and
+  Workers Traces at full sampling, and the API Worker logs through
+  `Logger.consoleStructured` so Workers Logs indexes each record's fields.
+  Cloudflare's automatic tracing covers the fetch handler, D1 statements, R2
+  operations and subrequests — including the website Worker's SSR and
+  `/api/auth/*`, neither of which was ever traced before. Effect's own
+  `Effect.fn` spans are **not** exported: Cloudflare's custom-span API parents by
+  async context and exposes no span ids, so no faithful bridge exists. Retention
+  is 3 days, or 7 on Workers Paid. See
+  [ADR 0025](docs/technical/adr/0025-cloudflare-native-observability.md).
 - **`apps/server/src/features/todos/todos.e2e.test.ts`** — deploys the stack with
   alchemy's `Test` harness, drives the real API with the shared typed client, and
   destroys it. Runs under `bun run test:e2e` and needs Cloudflare credentials.
@@ -115,12 +117,16 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
   `test-setup.ts`, `drizzle.config.ts`** and the committed Postgres migrations.
   The Bun server, the cluster/`WORKERS` knob, the OTLP exporters and the
   drizzle-kit workflow have no equivalent on a Worker.
-- **The OTLP exporter wiring in `apps/server/src/observability.ts`** — the Node
-  OTel SDK does not run on workerd. The file is back with a different job:
-  declaring the Axiom datasets and token the runtime's own exporter ships to
-  ([ADR 0023](docs/technical/adr/0023-axiom-is-the-telemetry-sink.md)). Gone with
-  it are `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `LOG_LEVEL`,
-  `LOG_FORMAT` and the `otel` compose profile.
+- **Every OTLP exporter, and every telemetry resource behind it.** The Node OTel
+  SDK does not run on workerd, and the Axiom datasets and ingest token that
+  briefly replaced it are gone too — Cloudflare records the telemetry now, as a
+  property of each Worker rather than a resource that multiplies per stage
+  ([ADR 0025](docs/technical/adr/0025-cloudflare-native-observability.md)). Gone
+  with them: `apps/server/src/observability.ts`, `Axiom.providers()`,
+  `AXIOM_TOKEN` and `AXIOM_ORG_ID`, `OTEL_EXPORTER_OTLP_ENDPOINT`,
+  `OTEL_SERVICE_NAME`, `LOG_LEVEL`, `LOG_FORMAT` and the `otel` compose profile.
+- **`todos_created_total`** — the one declared `Metric`. Nothing exports a metric
+  after ADR 0025, so the counter was dead code.
 - **`apps/web/src/access-log.ts`** — the Nitro plugin that logged one line per
   request. Worker logs cover it.
 

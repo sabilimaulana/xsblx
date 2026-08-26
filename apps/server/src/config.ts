@@ -57,3 +57,29 @@ export const SessionCookieConfig = Config.all({
     Config.withDefault("none" as const),
   ),
 });
+
+/**
+ * What Cloudflare records about a Worker (ADR 0025). The same block goes on both
+ * Workers — the API here and the website in `alchemy.run.ts` — so that the SSR
+ * Worker and `/api/auth/*` stop being the blind spots ADR 0023 left behind.
+ *
+ * A literal rather than a `Config`, because it is not per-stage: a stage that
+ * wants less telemetry wants a lower `headSamplingRate`, and nothing here is
+ * worth a variable until one does.
+ *
+ * `traces.propagationPolicy` is deliberately left at its default
+ * (`"authenticated"`). `"accept"` would adopt a caller's inbound `traceparent`
+ * as Cloudflare's own trace id, which is only useful when something of ours
+ * exports spans under that id — and after ADR 0025 nothing does. The default
+ * keeps the trace id unforgeable by callers.
+ */
+export const observability = {
+  enabled: true,
+  // Every event. This is a low-traffic stack, and a sampled trace is worse than
+  // no trace when the request you are chasing is the one that was dropped.
+  headSamplingRate: 1,
+  // `invocationLogs` is the request line itself — method, status, duration —
+  // which is what makes a log search answer "what happened" without a trace.
+  logs: { enabled: true, invocationLogs: true },
+  traces: { enabled: true },
+} as const;

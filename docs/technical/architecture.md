@@ -1,7 +1,7 @@
 ---
 status: active
-version: 2.0.0
-updated: 2026-08-20
+version: 2.1.0
+updated: 2026-08-26
 ---
 
 # Architecture
@@ -184,50 +184,48 @@ origin.
 
 ## Observability
 
-All three signals come from Effect itself and leave over OTLP to Axiom (ADR
-0015, ADR 0023). Both ends are declared in the stack, and there is no SDK to
-initialise — the exporter is a binding layer.
+Cloudflare records it, and there is nothing else (ADR 0025). Telemetry is a
+property of each Worker rather than a set of resources with a vendor behind
+them — a boolean per signal in the script's metadata, no dataset to declare, no
+ingest token to carry, and nothing that scales with the number of stages.
 
-| Piece         | File                                        | Responsibility                                                                        |
-| ------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Datasets      | `apps/server/src/observability.ts`          | One `Axiom.Dataset` per signal, named per stage, plus retention.                      |
-| Credential    | `apps/server/src/observability.ts`          | `Axiom.ApiToken` — `ingest: ["create"]` on those three datasets and nothing else.     |
-| Wiring        | `apps/server/src/worker.ts`                 | `Axiom.Telemetry({ token, traces, logs, metrics, serviceName })` in `Effect.provide`. |
-| Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` spans; `todos_created_total` counter. The copyable pattern.    |
+| Piece         | File                                        | Responsibility                                                                      |
+| ------------- | ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Configuration | `apps/server/src/config.ts`                 | The `observability` literal — logs, invocation logs, traces, `headSamplingRate: 1`. |
+| Wiring        | `apps/server/src/worker.ts`                 | The prop on the API Worker, and `Logger.consoleStructured` in the router's layers.  |
+| Wiring        | `alchemy.run.ts`                            | The same prop on the website Worker.                                                |
+| Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` span names. The copyable pattern.                            |
 
 What each signal is:
 
-- **Traces.** An `http.server` root span per request from the runtime, one span
-  per service method from `Effect.fn`, nested under it. Incoming `traceparent` is
-  honoured and Effect's `HttpClient` propagates it onward — which is why
-  `traceparent` and `b3` are in the CORS allow-list (ADR 0008).
-- **Logs.** Every `Effect.log*` record, with the span context attached. Effect's
-  default minimum level (`Info`) applies; there is no `LOG_LEVEL` variable.
-- **Metrics.** Effect's fiber runtime gauges plus declared `Metric`s.
+- **Traces.** Cloudflare's automatic tracing: the fetch handler, D1 statements,
+  R2 operations, subrequests. Both Workers, so SSR and `/api/auth/*` are visible
+  for the first time. **Effect's own spans are not in it** — see the ceiling
+  below.
+- **Logs.** Every `Effect.log*` record, written as an _object_ by
+  `Logger.consoleStructured` and indexed by Workers Logs into queryable fields.
+  `Logger.consoleJson` is the wrong half of that pair here: it stringifies, and a
+  logged string is one opaque message rather than a set of columns. Cloudflare
+  attributes console output to the active platform span, so logs and traces
+  correlate without carrying a trace id of their own. Effect's default minimum
+  level (`Info`) applies; there is no `LOG_LEVEL` variable.
+- **Metrics.** None. There is no sink for a `Metric`, so there is no `Metric` —
+  `todos_created_total` went with the exporter.
 
-Building the layer binds each dataset's OTLP endpoint as a plain var and the
-token's `Authorization` header as a **secret** onto the Worker; at runtime the
-exporters are built into each event's request scope and the flush is registered
-with `ctx.waitUntil`, so export happens after the response is sent. Every signal
-also carries `alchemy.stack` and `alchemy.stage` resource attributes, and
-`service.name` is pinned to `xsblx-api` — the default is the Worker's generated
-physical name, which changes per stage.
+`traces.propagationPolicy` is left at its default `"authenticated"`. `"accept"`
+would adopt a caller's inbound `traceparent` as Cloudflare's trace id, which only
+pays off when something of ours exports spans under the same id; nothing does.
+The CORS allow-list still carries `traceparent` and `b3` regardless — Effect's
+`HttpClient` in the browser sends them either way, and dropping them fails the
+preflight silently (ADR 0008).
 
-Datasets are `xsblx-<stage>-{traces,logs,metrics}`. Per stage, not shared: a
-`Dataset` is a resource in that stage's state, so one shared name would let
-`alchemy destroy` on a dev stage delete production's events.
-
-Deploying these resources needs an Axiom credential, which is alchemy's business
-rather than the app's: `alchemy login` reads `AXIOM_TOKEN` (or a stored token)
-alongside the Cloudflare step. The Worker itself only ever carries the
-ingest-only bearer.
-
-Two things this deliberately does not do. **Nothing alerts** — `Axiom.Monitor` and
-`Axiom.Notifier` are resources this stack does not declare, because a notifier
-needs a destination that is a decision about who gets paged. And **the website
-Worker exports nothing**: `Website.Vite` builds its Worker from Vite output and
-has no init Effect to provide a layer to, so SSR is covered by Cloudflare's own
-Workers Logs (`bun run tail`) and not by a trace.
+Two things this deliberately does not do. **Nothing alerts** — Cloudflare
+Notifications is the un-declared half, and it needs the same undecided answer
+about who gets paged. And **nothing is exported off Cloudflare**:
+`Cloudflare.Workers.ObservabilityDestination` models an OTLP destination and
+`observability.{logs,traces}.destinations` takes its slug, so pushing to a third
+party later needs none of this undone — but it would export what Cloudflare sees,
+never what Effect emits.
 
 ## Type-checking: `@effect/tsgo`
 
@@ -293,20 +291,27 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **List ordering is welded to `createdAt` descending, tie-broken by `id`.**
   Sorting by any other column needs a different cursor and a matching index
   (ADR 0016, ADR 0017).
-- **Instrumentation is no longer free.** Every span, log record and metric update
-  is serialised and POSTed once per event (ADR 0023). It runs in `ctx.waitUntil`
-  so the response is not delayed, but it is CPU on the Worker's budget and a
-  subrequest per signal. The lever, if it bites, is sampling — not deleting spans.
-- **The website Worker is invisible in a trace**, and so are auth routes: the
-  first has no init Effect to provide the exporter to (ADR 0023), the second runs
-  outside the Effect runtime (ADR 0007).
-- **Nothing alerts, and the ingest bearer lives in resource state.** Monitors are
-  undeclared, and Axiom hands the token over once at create time, so the state
-  store is as sensitive as the token (ADR 0023).
+- **A trace stops at the platform boundary.** The depth is `fetch → D1 query`,
+  with nothing between: no per-service-method latency, no `Todos.list` under the
+  request span. Cloudflare's custom-span API parents by async context and hands
+  out no span ids, and Effect's `Tracer` passes its parent explicitly across
+  fibers, so no faithful bridge exists at this version (ADR 0025). "Which method
+  was slow" is a log question now. This is the first ceiling worth revisiting.
+- **`Effect.fn` spans are built on every request and discarded**, and so is every
+  `Metric` update that gets declared. That is CPU on the Worker's budget with no
+  reader. The names are kept anyway: they are the entire cost of reversing
+  ADR 0025, and re-adding them across every service is the expensive half.
+- **Telemetry is retained for 3 days, or 7 on Workers Paid.** An incident older
+  than a week is not reconstructable. Logpush to R2 is the escape hatch and is
+  not declared (ADR 0025).
+- **Nothing alerts.** Cloudflare Notifications is undeclared, because a
+  notification needs a destination that is a decision about who gets paged
+  (ADR 0025).
 - **Destroying a stage destroys its telemetry**, including the trace of the run
-  you were reading. `NO_DESTROY=1` keeps an e2e stage alive (ADR 0023).
+  you were reading — it belongs to the Worker. `NO_DESTROY=1` keeps an e2e stage
+  alive (ADR 0025).
 - **Debug logging in a deployed stage is a code change.** Effect's default
-  minimum level applies and there is no `LOG_LEVEL` binding (ADR 0023).
+  minimum level applies and there is no `LOG_LEVEL` binding (ADR 0025).
 - **Throughput is unmeasured on this branch.** `main`'s numbers — 12k req/s at
   `WORKERS=4`, bounded by Better Auth's per-request CPU rather than by the
   database — described a Bun process on one box and say nothing about an isolate

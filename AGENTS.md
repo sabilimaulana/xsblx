@@ -58,30 +58,34 @@ another library for anything Effect already provides.
 
 ### Observability
 
-Effect owns all three signals; never add another library for them (ADR 0015).
-They ship to Axiom, and both ends are declared in the stack (ADR 0023): datasets
-and an ingest-only token in `apps/server/src/observability.ts`, and
-`Axiom.Telemetry` in the Worker's single `Effect.provide`. There is no SDK to
-initialise and no OTLP env var to set.
+Cloudflare records it, and there is no second vendor (ADR 0025). Telemetry is
+the `observability` prop on each Worker — the literal in
+`apps/server/src/config.ts`, on both the API Worker and the website. There is no
+exporter, no dataset, no ingest token, and no telemetry layer in the Worker's
+`Effect.provide`.
 
-- **A service method is declared with `Effect.fn("Todos.list")`, not a bare
-  generator.** The name is the span name — `Feature.method`. Dropping it makes
-  the feature invisible in a trace.
 - **Log through `Effect.log*`.** Never `console.log`: it bypasses the configured
-  logger, the level filter and the span context.
-- **A metric answers what a trace cannot.** Spans already carry per-call latency
-  and counts, so reach for `Metric` only for a total or a distribution no single
-  trace shows. One per feature is usually too many.
-- **A dataset is named per stage.** It is a resource in _that_ stage's state, so
-  a shared name means `alchemy destroy` on a dev stage deletes production's
-  events (ADR 0023).
+  logger and the level filter.
+- **The logger is `Logger.consoleStructured`, never `consoleJson`.** The first
+  hands `console.log` the record as an object and Workers Logs indexes its
+  fields; the second stringifies, and a logged string is one opaque message that
+  only a text match can find (ADR 0025).
+- **A service method is still declared with `Effect.fn("Todos.list")`, not a
+  bare generator.** The name is `Feature.method`. The span goes nowhere today —
+  keeping the names is the entire cost of reversing ADR 0025, and re-adding
+  them across every service is the expensive half.
+- **Do not add a `Metric`.** Nothing exports one, so a counter is dead code. A
+  metric returns when there is a sink for it (ADR 0025).
+- **Do not reach for `cloudflare:workers`' `tracing` API to export Effect
+  spans.** It parents by async context and hands out no span ids; Effect's
+  `Tracer` passes its parent explicitly across fibers. Any bridge flattens the
+  tree and looks correct while being wrong (ADR 0025).
+- **Leave `traces.propagationPolicy` at its default.** `"accept"` adopts a
+  caller's inbound `traceparent` as the trace id, which buys nothing while
+  nothing of ours exports spans — and makes the trace id forgeable.
 - **Import a barrel-shaped package by subpath.** `alchemy/Drizzle` eagerly loads
   its MySQL and Postgres drivers, whose optional peers are not installed —
-  `alchemy/Drizzle/D1`, `/Schema`, `/Providers`. Same trap as
-  `@effect/opentelemetry`'s root re-export of `WebSdk`.
-- **`Axiom.providers()` publishes the `HttpClient` the other provider layers
-  consume**, so it goes into the merge with `Layer.provideMerge`, never beside
-  them in `Layer.mergeAll` — parallel construction leaves that unsatisfied.
+  `alchemy/Drizzle/D1`, `/Schema`, `/Providers`.
 
 ### @effect/tsgo
 

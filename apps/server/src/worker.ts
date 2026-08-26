@@ -1,15 +1,14 @@
 import { BetterAuth } from "@alchemy.run/better-auth";
 import { Api } from "@xsblx/api/api";
-import * as Axiom from "alchemy/Axiom";
 import * as Cloudflare from "alchemy/Cloudflare";
 // Subpath import: the `alchemy/Drizzle` barrel eagerly loads its MySQL and
 // Postgres drivers, which this project does not install.
 import { D1 as drizzleD1 } from "alchemy/Drizzle/D1";
-import { Effect, Layer, Path } from "effect";
+import { Effect, Layer, Logger, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Assets } from "./assets.ts";
-import { ApiDomainConfig, CorsConfig } from "./config.ts";
+import { ApiDomainConfig, CorsConfig, observability } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
@@ -18,7 +17,6 @@ import { assetRoutes, authRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
 import { HealthHandlers } from "./features/health/http.ts";
 import { TodosApiHandlers } from "./features/todos/http.ts";
-import { Ingest, Logs, Metrics, Traces } from "./observability.ts";
 
 /**
  * There is no filesystem in a Worker isolate, so `HttpPlatform.layer` — which
@@ -54,7 +52,11 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   // A prop takes a `Config` directly, so the hostname is configuration rather
   // than a literal: a stage that names one serves on it and reports it as `url`,
   // and a stage that does not leaves custom domains unmanaged (ADR 0024).
-  { main: import.meta.url, domain: ApiDomainConfig },
+  //
+  // `observability` is the whole telemetry configuration now (ADR 0025): a
+  // boolean per signal, no dataset to declare, no ingest token to carry, and
+  // nothing that scales with the number of stages.
+  { main: import.meta.url, domain: ApiDomainConfig, observability },
   Effect.gen(function* () {
     const cors = yield* CorsConfig;
     const database = yield* Database;
@@ -86,7 +88,20 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
           // instance, so it stays substitutable; this is where the instance is
           // handed over.
           Layer.provide([Db.layer(db), Layer.succeed(BetterAuth)(betterAuth)]),
-          Layer.provide([Etag.layer, HttpPlatformStub, Path.layer]),
+          // `consoleStructured`, not `consoleJson`: it hands `console.log` the
+          // record as an *object*, and Workers Logs indexes a logged object's
+          // fields into queryable columns. A JSON string would arrive as one
+          // opaque message, searchable only by text match (ADR 0025).
+          //
+          // `Logger.layer` replaces the default logger set rather than merging
+          // with it, which is what we want — one indexed record per log, no
+          // second pretty copy of every line.
+          Layer.provide([
+            Etag.layer,
+            HttpPlatformStub,
+            Path.layer,
+            Logger.layer([Logger.consoleStructured]),
+          ]),
           Layer.provide(
             HttpRouter.cors({
               allowedOrigins: cors.allowedOrigins,
@@ -104,22 +119,9 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
       ),
     };
   }).pipe(
-    Effect.provide([
-      Cloudflare.D1.QueryDatabaseBinding,
-      Cloudflare.R2.ReadWriteBucketBinding,
-      // The exporter is a binding layer, not an SDK: building it binds each
-      // dataset's OTLP endpoint and the ingest token's Authorization header (as
-      // a secret) onto the Worker (ADR 0023). Without it Effect's tracer is a
-      // no-op and the instrumentation costs nothing.
-      Axiom.Telemetry({
-        token: Ingest,
-        traces: Traces,
-        logs: Logs,
-        metrics: Metrics,
-        // Otherwise `service.name` is the Worker's generated physical name,
-        // which carries the stage and changes per stage.
-        serviceName: "xsblx-api",
-      }),
-    ]),
+    // No telemetry layer: the platform records the trace, so there is no
+    // exporter to build and the only credential this Worker carries is
+    // `AUTH_SECRET` (ADR 0025).
+    Effect.provide([Cloudflare.D1.QueryDatabaseBinding, Cloudflare.R2.ReadWriteBucketBinding]),
   ),
 ) {}

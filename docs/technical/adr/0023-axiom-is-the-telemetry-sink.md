@@ -1,7 +1,8 @@
 ---
-status: accepted
-version: 1.0.0
-updated: 2026-08-20
+status: superseded
+version: 1.1.0
+updated: 2026-08-26
+superseded-by: ./0025-cloudflare-native-observability.md
 ---
 
 # 0023 — Axiom is the telemetry sink, wired as a binding layer

@@ -1,6 +1,5 @@
 import { Api } from "@xsblx/api/api";
 import * as Alchemy from "alchemy";
-import * as Axiom from "alchemy/Axiom";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
 import * as Test from "alchemy/Test/Bun";
@@ -22,12 +21,10 @@ import Stack from "../../../../../alchemy.run.ts";
  */
 describe("todos over the deployed API", () => {
   const { test, beforeAll, afterAll, deploy, destroy } = Test.make({
-    // Axiom's provider layer publishes the `HttpClient` the others consume, so it
-    // is provided *into* the merge rather than merged beside it — `Layer.mergeAll`
-    // builds in parallel and would leave that dependency unsatisfied.
-    providers: Layer.mergeAll(Cloudflare.providers(), drizzleProviders()).pipe(
-      Layer.provideMerge(Axiom.providers()),
-    ),
+    // Mirrors the stack's own provider layer: one vendor since ADR 0025, so
+    // there is no second provider to merge in and nothing that publishes an
+    // `HttpClient` the others would need.
+    providers: Layer.mergeAll(Cloudflare.providers(), drizzleProviders()),
     state: Alchemy.localState(),
   });
 
@@ -45,8 +42,9 @@ describe("todos over the deployed API", () => {
       ),
     ),
   );
-  // `NO_DESTROY=1` leaves the stage — and its Axiom datasets — up, which is the
-  // only way to read the trace of a run that just failed (ADR 0023).
+  // `NO_DESTROY=1` leaves the stage's Workers up. Telemetry now belongs to the
+  // Worker rather than to a resource of its own (ADR 0025), so a destroyed stage
+  // takes its logs and traces with it — keep the stage to read them.
   afterAll.skipIf(!!process.env["NO_DESTROY"])(destroy(Stack));
 
   /** The harness already provides `HttpClient`, so the client needs no layer. */

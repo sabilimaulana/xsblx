@@ -2,7 +2,7 @@ import type { TodoCursor, TodoStatus } from "@xsblx/api/todos/schema";
 import { Todo, TodoId, TodoPage, todoCursor, todoCursorParts } from "@xsblx/api/todos/schema";
 import { TodoNotFound, TodosError } from "@xsblx/api/todos/errors";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { Context, Effect, Layer, Metric } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { Db } from "../../db/index.ts";
 import { todos } from "./schema.ts";
 
@@ -20,19 +20,6 @@ const toDomain = (row: TodoRow): Todo =>
     completed: row.completed,
     createdAt: row.createdAt,
   });
-
-/**
- * A domain counter, and the only one this feature needs — spans already carry
- * per-call latency, so a metric earns its place only when the question is about
- * a total nobody can answer from a trace (ADR 0015).
- *
- * It is exported to Axiom's metrics dataset with the rest (ADR 0023); declaring
- * one is cheap and never fails.
- */
-export const todosCreated = Metric.counter("todos_created_total", {
-  description: "Todos successfully inserted.",
-  incremental: true,
-});
 
 /** A row only exists for its owner — the id alone is never enough to reach it. */
 const owned = (userId: string, id: TodoId) => and(eq(todos.id, id), eq(todos.userId, userId));
@@ -136,8 +123,6 @@ export class Todos extends Context.Service<
           .values({ userId, title: input.title })
           .returning()
           .pipe(Effect.orDie);
-        // After the insert, so a failed write never counts as a creation.
-        yield* Metric.update(todosCreated, 1);
         return toDomain(rows[0]!);
       });
 

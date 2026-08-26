@@ -1,10 +1,11 @@
 ---
 status: accepted
-version: 1.1.0
-updated: 2026-08-11
+version: 1.2.0
+updated: 2026-08-26
 amended-by:
   - ./0019-cloudflare-deploy-through-alchemy.md
   - ./0023-axiom-is-the-telemetry-sink.md
+  - ./0025-cloudflare-native-observability.md
 ---
 
 # 0015 — Effect-native observability, exported over OTLP
