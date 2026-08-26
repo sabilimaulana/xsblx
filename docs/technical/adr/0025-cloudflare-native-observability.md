@@ -1,6 +1,6 @@
 ---
 status: accepted
-version: 1.0.0
+version: 1.1.0
 updated: 2026-08-26
 supersedes:
   - ./0023-axiom-is-the-telemetry-sink.md
@@ -147,6 +147,16 @@ colleague's `dev_$USER` stage and `prod` both need it — the import,
 resolves all come out in a follow-up commit. Until then the dependency is
 retained for deletion only: nothing in the program declares an Axiom resource,
 and a stage that never had one deploys the same either way.
+
+**This is done, as of 2026-08-26.** Both stages in this state store —
+`dev_sabilimaulana` and `prod` — were deployed and now list five rows apiece
+(`Api`, `Assets`, `Database`, `Schema`, `Website`) and no Axiom row, so
+`Axiom.providers()`, its import and the `AXIOM_TOKEN`/`AXIOM_ORG_ID` variables
+are gone. The procedure above is kept because it is not finished for everyone:
+**a state store that still holds a stage deployed before ADR 0025 needs it
+again**, and the symptom is the `MissingProviderError` above rather than a
+missing dataset. Check with `alchemy state resources --stack xsblx --stage
+<name>` before assuming a stage is clean.
 
 ## Consequences
 

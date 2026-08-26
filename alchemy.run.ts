@@ -1,5 +1,4 @@
 import * as Alchemy from "alchemy";
-import * as Axiom from "alchemy/Axiom";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
 import { Effect, Layer } from "effect";
@@ -22,24 +21,10 @@ import ApiWorker from "./apps/server/src/worker.ts";
 export default Alchemy.Stack(
   "xsblx",
   {
-    // Telemetry is a Worker property rather than a set of resources since ADR
-    // 0025, so Cloudflare is the only provider this program still *builds* with.
-    //
-    // `Axiom.providers()` is here for one reason and on its way out: every stage
-    // deployed before ADR 0025 has four `Axiom.Dataset`/`Axiom.ApiToken` rows in
-    // its state, and alchemy can only destroy a row whose provider is still
-    // registered — without this, `alchemy plan` fails outright with
-    // `MissingProviderError: No provider is registered for resource type
-    // 'Axiom.Dataset'`. It stays until every stage has been deployed once and
-    // the rows are gone, then this import and the `AXIOM_TOKEN` it needs both
-    // go. See ADR 0025, "Migrating a stage that was deployed before this".
-    //
-    // Axiom's provider layer publishes the `HttpClient` the others consume, so it
-    // is provided *into* the merge rather than merged beside it — `Layer.mergeAll`
-    // builds in parallel and would leave that dependency unsatisfied.
-    providers: Layer.mergeAll(Cloudflare.providers(), drizzleProviders()).pipe(
-      Layer.provideMerge(Axiom.providers()),
-    ),
+    // Cloudflare is the only provider. Telemetry is a property of each Worker
+    // rather than a set of resources with a vendor behind it (ADR 0025), so
+    // there is nothing here that a second provider layer would satisfy.
+    providers: Layer.mergeAll(Cloudflare.providers(), drizzleProviders()),
     // Deploys share one state store, so a teammate's or CI's plan diffs against
     // the same recorded state this machine does.
     state: Cloudflare.state(),

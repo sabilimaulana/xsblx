@@ -32,9 +32,10 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
   `--env-file .env.prod.local` (gitignored), which supplies a prod-only
   `AUTH_SECRET` and a `CORS_ALLOWED_ORIGINS` holding just the prod website
   Worker. It sources `.env` into the environment first, because alchemy resolves
-  the dotenv file ahead of the environment and falls back to it — so Cloudflare
-  credentials still come from `.env` while those two values are overridden.
-  Exporting the variables alone does **not** override `.env`.
+  the dotenv file ahead of the environment and falls back to it — so anything
+  `.env.prod.local` omits still resolves. Exporting the variables alone does
+  **not** override `.env`. Provider credentials are not involved either way:
+  they come from `alchemy login`, not from `.env`.
 - **Observability is Cloudflare's, on both Workers.** The `observability` literal
   in `apps/server/src/config.ts` turns on Workers Logs, invocation logs and
   Workers Traces at full sampling, and the API Worker logs through
