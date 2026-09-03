@@ -71,8 +71,9 @@ both edges would make the two Workers a cycle in the deploy graph.
 
 - Workspace packages are `@xsblx/*`. UI imports as `@xsblx/ui/components/<name>`,
   `@xsblx/ui/lib/utils`, `@xsblx/ui/globals.css`. `lib/utils` re-exports `cn` from
-  `cnfast`, which replaces the usual `clsx` + `tailwind-merge` pair — the path
-  stays because shadcn generates imports against it.
+  [`cn`](https://github.com/shadcn-ui/cn), which replaces the usual `clsx` +
+  `tailwind-merge` pair — the path stays because shadcn generates imports
+  against it.
 - `packages/api` exports one subpath per feature file — `@xsblx/api/<feature>/<file>`
   via `"./*": "./src/features/*.ts"` — plus `@xsblx/api/api` for the root.
 - Inside `apps/web`, `@/*` maps to `apps/web/src/*`. It is the only in-app alias.

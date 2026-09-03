@@ -54,6 +54,11 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **`cn` comes from [`cn`](https://github.com/shadcn-ui/cn)**, replacing
+  `cnfast`. `packages/ui/src/lib/utils.ts` re-exports it, so
+  `@xsblx/ui/lib/utils` is still the import path for components and for the
+  `utils` alias in both `components.json` files.
+
 - **Bun is 1.4.0** — in CI (`setup-bun`) and in `@types/bun`. The re-resolve also
   drops the `pg` and `crossws` entries the lockfile still carried from before D1.
 
