@@ -50,6 +50,11 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **`cn` comes from [`cn`](https://github.com/shadcn-ui/cn)**, replacing
+  `cnfast`. `packages/ui/src/lib/utils.ts` re-exports it, so
+  `@xsblx/ui/lib/utils` is still the import path for components and for the
+  `utils` alias in both `components.json` files.
+
 - **Bun is 1.4.0** — in the Docker image (`oven/bun:1.4.0-alpine`), in CI
   (`setup-bun`) and in `@types/bun`. See
   [ADR 0014](docs/technical/adr/0014-one-dockerfile-one-compose-file.md).
