@@ -48,7 +48,7 @@
     "tail": "alchemy logs --tail --stage dev_$USER",
     "build": "bun run --filter web build",
     "test": "bun run --filter '*' test",
-    "test:e2e": "bun run --filter server test:e2e",
+    "test:e2e": "bun test .e2e.test.ts --path-ignore-patterns 'repos/**'",
     "typecheck": "tsc --noEmit && bun run --filter '*' typecheck",
     "lint": "oxlint --disable-nested-config",
     "format": "oxfmt --disable-nested-config",

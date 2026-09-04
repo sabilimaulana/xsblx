@@ -154,6 +154,13 @@ no OTLP endpoint.
   `*.e2e.test.ts`: it deploys the stack with alchemy's `Test` harness, drives the
   real API, and runs under `bun run test:e2e` with credentials. Both live beside
   the code they test. No `test/` directory, no hand-written in-memory fake.
+- **`test:e2e` is a root script and must stay one.** It runs `bun test` from the
+  workspace root, because the stack it imports resolves its paths against
+  `process.cwd()` — under `--filter server` the cwd is `apps/server` and
+  `db/database.ts` asks drizzle-kit for
+  `apps/server/apps/server/src/db/schema.ts`. It also passes
+  `--path-ignore-patterns 'repos/**'`, so a vendored repo that happens to carry
+  an e2e test never joins a run that deploys.
 - Source files are lowercase (`api.ts`, `http.ts`) except React components, which
   follow the shadcn/TanStack conventions already in place.
 - `apps/web/src/routeTree.gen.ts` is generated — never edit it.

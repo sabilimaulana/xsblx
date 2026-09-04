@@ -4,8 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:e2e": "bun test src/**/*.e2e.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@alchemy.run/better-auth": "catalog:alchemy",

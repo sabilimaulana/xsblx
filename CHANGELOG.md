@@ -164,6 +164,14 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Fixed
 
+- **`bun run test:e2e` runs again.** It was broken in two ways since the
+  Cloudflare migration, both predating this upgrade: `bun test src/**/*.e2e.test.ts`
+  matched nothing because bun reads an unexpanded `**` as a name filter, and
+  running under `--filter server` put the cwd in `apps/server`, so the stack's
+  root-relative paths resolved to `apps/server/apps/server/src/db/schema.ts`. It
+  is now a root script — `bun test .e2e.test.ts --path-ignore-patterns 'repos/**'`
+  — and the ignore pattern keeps vendored repos out of a run that deploys.
+
 - **The API Worker answered 500 on every route after the first deploy.**
   `db/database.ts` computed its `Drizzle.Schema` paths with
   `fileURLToPath(new URL(…, import.meta.url))`, and that module is yielded in the
