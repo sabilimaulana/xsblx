@@ -26,8 +26,8 @@
         "alchemy": "https://pkg.ing/alchemy/e05c734ea30625efd07a443cef267bfde225f5b4"
       },
       "auth": {
-        "@better-auth/drizzle-adapter": "1.7.0-rc.4",
-        "better-auth": "1.7.0-rc.4"
+        "@better-auth/drizzle-adapter": "1.7.2",
+        "better-auth": "1.7.2"
       },
       "effect": {
         "@effect/platform-bun": "4.0.0-rc.112",

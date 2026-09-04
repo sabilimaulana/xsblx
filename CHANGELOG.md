@@ -63,6 +63,12 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Better Auth is `1.7.2`**, off the `1.7.0-rc.4` prerelease, along with
+  `@better-auth/drizzle-adapter`. This also clears the install warning ADR 0022
+  recorded: `@alchemy.run/better-auth` declares `better-auth@^1.6.2`, and a
+  prerelease never satisfies a caret range, so every `bun install` reported an
+  incorrect peer dependency. A stable version does.
+
 - **The API Worker pins `compatibility: { date: "2026-08-25" }`.**
   `tracing.startActiveSpan` exists from `2026-07-28` and alchemy's default is
   months older, so without the pin `alchemy deploy` fails with
