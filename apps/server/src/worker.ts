@@ -7,7 +7,7 @@ import { Effect, Layer, Logger, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Assets } from "./assets.ts";
-import { ApiDomainConfig, CorsConfig, observability } from "./config.ts";
+import { apiObservability, ApiDomainConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
@@ -52,10 +52,23 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   // than a literal: a stage that names one serves on it and reports it as `url`,
   // and a stage that does not leaves custom domains unmanaged (ADR 0024).
   //
-  // `observability` is the whole telemetry configuration now (ADR 0025): a
-  // boolean per signal, no dataset to declare, no ingest token to carry, and
-  // nothing that scales with the number of stages.
-  { main: import.meta.url, domain: ApiDomainConfig, observability },
+  // `observability` still carries the log configuration (ADR 0025), but no
+  // longer `traces`: `Cloudflare.Telemetry()` below binds those, and a `traces`
+  // block written here would win over the bound one and drop its sampling rate.
+  //
+  // The compatibility date is load-bearing, not housekeeping.
+  // `tracing.startActiveSpan` — the API the Effect tracer forwards spans into —
+  // exists from 2026-07-28, and alchemy's default is months older; below the
+  // floor the deploy fails with `CloudflareTelemetryCompatibilityError` rather
+  // than dropping spans quietly. It also clears 2026-08-04, from which
+  // `nodejs_compat` is on by default, and the tracer imports `node:async_hooks`
+  // (ADR 0026).
+  {
+    main: import.meta.url,
+    domain: ApiDomainConfig,
+    observability: apiObservability,
+    compatibility: { date: "2026-08-25" },
+  },
   Effect.gen(function* () {
     const cors = yield* CorsConfig;
     const database = yield* Database;
@@ -118,9 +131,19 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
       ),
     };
   }).pipe(
-    // No telemetry layer: the platform records the trace, so there is no
-    // exporter to build and the only credential this Worker carries is
-    // `AUTH_SECRET` (ADR 0025).
-    Effect.provide([Cloudflare.D1.QueryDatabaseBinding, Cloudflare.R2.ReadWriteBucketBinding]),
+    // `Cloudflare.Telemetry()` is the whole trace export (ADR 0026). It turns on
+    // `observability.traces` for this Worker and installs a per-event Effect
+    // `Tracer` over `tracing.startActiveSpan`, so `Effect.fn("Todos.list")`
+    // frames nest inside Cloudflare's own fetch and D1 spans. There is still no
+    // exporter, no OTLP endpoint and no flush — Cloudflare owns sampling and
+    // submission — and the only credential this Worker carries is `AUTH_SECRET`.
+    Effect.provide([
+      Cloudflare.D1.QueryDatabaseBinding,
+      Cloudflare.R2.ReadWriteBucketBinding,
+      // Every event, for the reason ADR 0025 gave when this was a prop: on a
+      // low-traffic stack a sampled trace is worse than no trace, because the
+      // request you are chasing is the one that was dropped.
+      Cloudflare.Telemetry({ headSamplingRate: 1 }),
+    ]),
   ),
 ) {}

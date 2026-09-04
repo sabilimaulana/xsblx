@@ -3,7 +3,7 @@ import * as Cloudflare from "alchemy/Cloudflare";
 import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
 import { Effect, Layer } from "effect";
 import { fileURLToPath } from "node:url";
-import { observability, WebDomainConfig } from "./apps/server/src/config.ts";
+import { WebDomainConfig, websiteObservability } from "./apps/server/src/config.ts";
 import { Database } from "./apps/server/src/db/database.ts";
 import ApiWorker from "./apps/server/src/worker.ts";
 
@@ -22,8 +22,9 @@ export default Alchemy.Stack(
   "xsblx",
   {
     // Cloudflare is the only provider. Telemetry is a property of each Worker
-    // rather than a set of resources with a vendor behind it (ADR 0025), so
-    // there is nothing here that a second provider layer would satisfy.
+    // and, on the API, a layer inside it (ADR 0025, ADR 0026) — never a set of
+    // resources with a vendor behind it, so there is nothing here that a second
+    // provider layer would satisfy.
     providers: Layer.mergeAll(Cloudflare.providers(), drizzleProviders()),
     // Deploys share one state store, so a teammate's or CI's plan diffs against
     // the same recorded state this machine does.
@@ -41,10 +42,14 @@ export default Alchemy.Stack(
       // leaves custom domains unmanaged and `workers.dev` stands (ADR 0024).
       domain: WebDomainConfig,
       // `ViteProps` is `Omit<WorkerProps, "vite" | "main" | "assets">`, so the
-      // website takes the same block the API does — which is what ends ADR
-      // 0023's "the website Worker exports nothing" (ADR 0025). SSR and the
+      // website takes an `observability` block of its own — which is what ends
+      // ADR 0023's "the website Worker exports nothing" (ADR 0025). SSR and the
       // server routes are traced by the platform, with no init Effect needed.
-      observability,
+      //
+      // Unlike the API's, this block keeps `traces`: without an init Effect there
+      // is no `Effect.provide` to put `Cloudflare.Telemetry()` in, and no Effect
+      // runtime in the SSR bundle for it to install a `Tracer` into (ADR 0026).
+      observability: websiteObservability,
       // `VITE_`-prefixed, so the API origin is inlined into the client bundle at
       // build time — the browser talks to the API Worker directly.
       env: { VITE_API_URL: api.url.as<string>() },

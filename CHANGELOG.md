@@ -11,6 +11,15 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **Effect's spans are back in the trace, inside Cloudflare's own waterfall.**
+  The API Worker provides `Cloudflare.Telemetry({ headSamplingRate: 1 })`, which
+  installs a per-event Effect `Tracer` over `tracing.startActiveSpan` — so
+  `Effect.fn("Todos.list")` frames nest under Cloudflare's fetch and D1 spans
+  instead of going nowhere. There is still no exporter, no OTLP endpoint and no
+  flush. Scalar span annotations cross over; events, links and non-scalars stay
+  Effect-local, and completion arrives as an `effect.exit` attribute. See
+  [ADR 0026](docs/technical/adr/0026-effect-spans-in-cloudflares-waterfall.md).
+
 - **The whole system deploys to Cloudflare from one alchemy program.** The root
   `alchemy.run.ts` is the stack: a D1 database, an R2 bucket, the API as a
   `Cloudflare.Worker` and the web app as a `Cloudflare.Website.Vite`. `bun run
@@ -53,6 +62,19 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
   See [ADR 0020](docs/technical/adr/0020-d1-is-the-database.md).
 
 ### Changed
+
+- **The API Worker pins `compatibility: { date: "2026-08-25" }`.**
+  `tracing.startActiveSpan` exists from `2026-07-28` and alchemy's default is
+  months older, so without the pin `alchemy deploy` fails with
+  `CloudflareTelemetryCompatibilityError`. The date also clears `2026-08-04`,
+  from which `nodejs_compat` is on by default — the tracer imports
+  `node:async_hooks`. The website Worker's date is unchanged.
+
+- **`observability` splits into `apiObservability` and `websiteObservability`.**
+  Only the website's carries `traces`: on the API the layer binds them, and an
+  explicit `traces` on the prop wins over a bound one and silently drops its
+  sampling rate. The website has no init Effect to provide a layer to, so
+  Cloudflare's automatic instrumentation stays its whole trace.
 
 - **Effect, drizzle and alchemy move to one rc version set.** `effect` and its
   companions are `4.0.0-rc.112`, `@effect/tsgo` is `0.40.0`, `drizzle-orm` and
