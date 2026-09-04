@@ -48,21 +48,24 @@ another library for anything Effect already provides.
 
 - **Read `repos/effect/LLMS.md` before writing any Effect code.** `repos/effect/`
   is the API source of truth, vendored at the exact runtime version.
-- **Effect is pinned to `4.0.0-beta.103`. Never bump it or its companions
-  individually** (ADR 0002). Consequences that bite daily: errors are
-  `Schema.TaggedErrorClass<Self>()(tag, fields, annotations)`, **not**
-  `Schema.TaggedError`; drizzle queries are Effects failing with `SqlError`, so
-  `Effect.orDie` them in services rather than widening a domain error channel.
+- **Effect is `4.0.0-rc.112`, and it moves only as part of one version set:
+  effect + `@effect/*` + `@effect/tsgo` + `drizzle-orm`/`drizzle-kit` +
+  `alchemy`** (ADR 0027). The alchemy build pins the effect floor and the exact
+  drizzle sha, so bumping one alone does not install. Consequences that bite
+  daily: errors are `Schema.TaggedError<Self>()(tag, fields, annotations)` —
+  renamed from `Schema.TaggedErrorClass` in beta.104 — and drizzle queries are
+  Effects failing with `SqlError`, so `Effect.orDie` them in services rather
+  than widening a domain error channel.
 - Bump versions through the root `package.json` catalogs, never in a single
   workspace.
 
 ### Observability
 
-Cloudflare records it, and there is no second vendor (ADR 0025). Telemetry is
-the `observability` prop on each Worker — the literal in
-`apps/server/src/config.ts`, on both the API Worker and the website. There is no
-exporter, no dataset, no ingest token, and no telemetry layer in the Worker's
-`Effect.provide`.
+Cloudflare records it, and there is no second vendor (ADR 0025, ADR 0026).
+Telemetry is the `observability` prop on each Worker — the two literals in
+`apps/server/src/config.ts` — plus `Cloudflare.Telemetry()` inside the API
+Worker's `Effect.provide`. There is no exporter, no dataset, no ingest token and
+no OTLP endpoint.
 
 - **Log through `Effect.log*`.** Never `console.log`: it bypasses the configured
   logger and the level filter.
@@ -70,19 +73,31 @@ exporter, no dataset, no ingest token, and no telemetry layer in the Worker's
   hands `console.log` the record as an object and Workers Logs indexes its
   fields; the second stringifies, and a logged string is one opaque message that
   only a text match can find (ADR 0025).
-- **A service method is still declared with `Effect.fn("Todos.list")`, not a
-  bare generator.** The name is `Feature.method`. The span goes nowhere today —
-  keeping the names is the entire cost of reversing ADR 0025, and re-adding
-  them across every service is the expensive half.
-- **Do not add a `Metric`.** Nothing exports one, so a counter is dead code. A
-  metric returns when there is a sink for it (ADR 0025).
-- **Do not reach for `cloudflare:workers`' `tracing` API to export Effect
-  spans.** It parents by async context and hands out no span ids; Effect's
-  `Tracer` passes its parent explicitly across fibers. Any bridge flattens the
-  tree and looks correct while being wrong (ADR 0025).
+- **A service method is declared with `Effect.fn("Todos.list")`, not a bare
+  generator.** The name is `Feature.method`, and it is what the Workers trace
+  waterfall shows (ADR 0026).
+- **`Cloudflare.Telemetry()` is the only way Effect spans are exported.** Never
+  reach for `cloudflare:workers`' `tracing` API directly: the layer's tracer
+  captures `AsyncLocalStorage.snapshot()` inside `startActiveSpan` and re-enters
+  it from the child, which is what keeps Effect's cross-fiber parentage intact.
+  A hand-rolled bridge flattens the tree and looks correct while being wrong
+  (ADR 0025, ADR 0026).
+- **The API Worker's `observability` carries no `traces` block.** An explicit
+  `observability.traces` on the prop wins over the one `Cloudflare.Telemetry()`
+  binds and silently discards its sampling rate. Sampling for that Worker is a
+  layer prop. The website's literal keeps `traces`, because it has no init
+  Effect to provide a layer to.
+- **The API Worker's `compatibility.date` may not go below `2026-07-28`.**
+  `tracing.startActiveSpan` does not exist before it and the deploy fails with
+  `CloudflareTelemetryCompatibilityError`. It is pinned at `2026-08-25`, which
+  also clears the `2026-08-04` `nodejs_compat` default the tracer's
+  `node:async_hooks` import needs.
+- **Do not add a `Metric`.** The telemetry layer provides a `Tracer` and nothing
+  else, so a counter still has no reader and is dead code. A metric returns when
+  there is a sink for it (ADR 0025).
 - **Leave `traces.propagationPolicy` at its default.** `"accept"` adopts a
-  caller's inbound `traceparent` as the trace id, which buys nothing while
-  nothing of ours exports spans — and makes the trace id forgeable.
+  caller's inbound `traceparent` as Cloudflare's own trace id, which makes the
+  trace id forgeable by anyone who can call the API.
 - **Import a barrel-shaped package by subpath.** `alchemy/Drizzle` eagerly loads
   its MySQL and Postgres drivers, whose optional peers are not installed —
   `alchemy/Drizzle/D1`, `/Schema`, `/Providers`.
@@ -207,9 +222,11 @@ pointed at the real cloud resources.
   value bound.
 - **Hostnames are never derived from the stage name.** The default stage is
   `dev_$USER`, and an underscore is not legal in a hostname (ADR 0024).
-- **`alchemy` is pinned to `2.0.0-beta.70` — the tag `scripts/vendor.sh` fetches.**
-  Bump the dependency and the vendored source together, never one alone, the way
-  `effect` and `repos/effect` already move.
+- **`alchemy` is pinned to a commit, not a release** — merge commit `e05c734`,
+  installed from pkg.ing, because PR 1444 is unreleased (ADR 0027). The same sha
+  is what `scripts/vendor.sh` fetches. Bump the dependency and the vendored
+  source together, never one alone, the way `effect` and `repos/effect` already
+  move — and remember `@alchemy.run/better-auth` is pinned to the same sha.
 - **Paths depend on whether the Worker bundles the file.** `alchemy` runs from
   the workspace root, so a bare relative path resolves against the root, not
   against the declaring file. Two cases, and mixing them up breaks production:

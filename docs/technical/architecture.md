@@ -17,8 +17,8 @@ Cloudflare through one alchemy stack (ADR 0019).
 
 | Path             | Stack                                                                          | Deploys as                |
 | ---------------- | ------------------------------------------------------------------------------ | ------------------------- |
-| `alchemy.run.ts` | alchemy 2 (beta.70) — the whole deploy as one Effect program                   | the stack itself          |
-| `apps/server`    | Effect 4 (beta.103), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding   | `Cloudflare.Worker`       |
+| `alchemy.run.ts` | alchemy 2 (commit `e05c734`) — the whole deploy as one Effect program          | the stack itself          |
+| `apps/server`    | Effect 4 (rc.112), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding     | `Cloudflare.Worker`       |
 | `apps/web`       | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                   | `Cloudflare.Website.Vite` |
 | `packages/api`   | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`) | —                         |
 | `packages/ui`    | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`     | —                         |
@@ -48,7 +48,7 @@ stores them in `~/.alchemy/profiles.json`, and CI passes
 ```
 alchemy.run.ts                    one stack, "xsblx"
 ├── Drizzle.Schema  "Schema"      generates pending migration SQL → apps/server/drizzle/
-├── D1.Database     "Database"    applies it (migrationsTable: drizzle_migrations)
+├── D1.Database     "Database"    applies it (migrations: Schema, ledger __alchemy_migrations)
 ├── R2.Bucket       "Assets"      public/avatars/<id>.svg
 ├── Worker          "Api"         apps/server/src/worker.ts — HttpApi + /api/auth/* + /public/*
 └── Website.Vite    "Website"     apps/web — SSR Worker + static assets, VITE_API_URL = Api.url
@@ -192,17 +192,22 @@ ingest token to carry, and nothing that scales with the number of stages.
 
 | Piece         | File                                        | Responsibility                                                                      |
 | ------------- | ------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Configuration | `apps/server/src/config.ts`                 | The `observability` literal — logs, invocation logs, traces, `headSamplingRate: 1`. |
-| Wiring        | `apps/server/src/worker.ts`                 | The prop on the API Worker, and `Logger.consoleStructured` in the router's layers.  |
-| Wiring        | `alchemy.run.ts`                            | The same prop on the website Worker.                                                |
+| Configuration | `apps/server/src/config.ts`                 | `apiObservability` (logs only) and `websiteObservability` (logs + traces).          |
+| Wiring        | `apps/server/src/worker.ts`                 | The prop, `Cloudflare.Telemetry()`, and `Logger.consoleStructured` in the layers.   |
+| Wiring        | `alchemy.run.ts`                            | `websiteObservability` on the website Worker.                                       |
 | Instrumenting | `apps/server/src/features/todos/service.ts` | `Effect.fn("Todos.…")` span names. The copyable pattern.                            |
 
 What each signal is:
 
 - **Traces.** Cloudflare's automatic tracing: the fetch handler, D1 statements,
-  R2 operations, subrequests. Both Workers, so SSR and `/api/auth/*` are visible
-  for the first time. **Effect's own spans are not in it** — see the ceiling
-  below.
+  R2 operations, subrequests. Both Workers, so SSR and `/api/auth/*` are visible.
+  On the API Worker, `Cloudflare.Telemetry({ headSamplingRate: 1 })` adds
+  Effect's own spans to the same waterfall, so an `Effect.fn("Todos.list")` frame
+  nests between the fetch span and the D1 statement it issues (ADR 0026). Scalar
+  `Effect.annotateCurrentSpan` values are forwarded; events, links and
+  non-scalars stay Effect-local, and completion arrives as an `effect.exit`
+  attribute of `success`, `failure` or `interrupted`. The website Worker has no
+  Effect runtime, so its trace is the platform's alone.
 - **Logs.** Every `Effect.log*` record, written as an _object_ by
   `Logger.consoleStructured` and indexed by Workers Logs into queryable fields.
   `Logger.consoleJson` is the wrong half of that pair here: it stringifies, and a
@@ -210,13 +215,14 @@ What each signal is:
   attributes console output to the active platform span, so logs and traces
   correlate without carrying a trace id of their own. Effect's default minimum
   level (`Info`) applies; there is no `LOG_LEVEL` variable.
-- **Metrics.** None. There is no sink for a `Metric`, so there is no `Metric` —
+- **Metrics.** None. The telemetry layer provides a `Tracer` and nothing else,
+  so there is still no sink for a `Metric` and therefore no `Metric` —
   `todos_created_total` went with the exporter.
 
 `traces.propagationPolicy` is left at its default `"authenticated"`. `"accept"`
-would adopt a caller's inbound `traceparent` as Cloudflare's trace id, which only
-pays off when something of ours exports spans under the same id; nothing does.
-The CORS allow-list still carries `traceparent` and `b3` regardless — Effect's
+would adopt a caller's inbound `traceparent` as Cloudflare's trace id, which
+makes the trace id forgeable by anyone who can reach the API. The CORS
+allow-list still carries `traceparent` and `b3` regardless — Effect's
 `HttpClient` in the browser sends them either way, and dropping them fails the
 preflight silently (ADR 0008).
 
@@ -292,16 +298,18 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **List ordering is welded to `createdAt` descending, tie-broken by `id`.**
   Sorting by any other column needs a different cursor and a matching index
   (ADR 0016, ADR 0017).
-- **A trace stops at the platform boundary.** The depth is `fetch → D1 query`,
-  with nothing between: no per-service-method latency, no `Todos.list` under the
-  request span. Cloudflare's custom-span API parents by async context and hands
-  out no span ids, and Effect's `Tracer` passes its parent explicitly across
-  fibers, so no faithful bridge exists at this version (ADR 0025). "Which method
-  was slow" is a log question now. This is the first ceiling worth revisiting.
-- **`Effect.fn` spans are built on every request and discarded**, and so is every
-  `Metric` update that gets declared. That is CPU on the Worker's budget with no
-  reader. The names are kept anyway: they are the entire cost of reversing
-  ADR 0025, and re-adding them across every service is the expensive half.
+- **The website Worker's trace stops at the platform boundary.** `Website.Vite`
+  has no init Effect and no Effect runtime in the SSR bundle, so there is nothing
+  to install a `Tracer` into: its depth is whatever Cloudflare instruments
+  automatically. The API Worker no longer has this ceiling (ADR 0026).
+- **The API Worker's compatibility date is pinned to `2026-08-25` and cannot go
+  below `2026-07-28`.** `tracing.startActiveSpan` does not exist before that, and
+  the deploy fails with `CloudflareTelemetryCompatibilityError` rather than
+  silently dropping spans.
+- **`Metric` updates are still built on every request and discarded** should one
+  ever be declared. Spans are not: `isTraced` on the Cloudflare span cascades
+  into Effect's `sampled` flag, so an untraced invocation skips the whole
+  subtree.
 - **Telemetry is retained for 3 days, or 7 on Workers Paid.** An incident older
   than a week is not reconstructable. Logpush to R2 is the escape hatch and is
   not declared (ADR 0025).
