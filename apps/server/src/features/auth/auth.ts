@@ -1,11 +1,10 @@
-import { BetterAuth } from "@alchemy.run/better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { MIN_PASSWORD_LENGTH } from "@xsblx/api/auth/credentials";
 import type { RuntimeContext } from "alchemy";
 import type * as Cloudflare from "alchemy/Cloudflare";
 import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/d1";
-import { Config, Effect, Redacted } from "effect";
+import { Config, Context, Effect, Redacted } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { SessionCookieConfig } from "../../config.ts";
 import { newId } from "../../id.ts";
@@ -29,15 +28,18 @@ export type BetterAuthOptions = {
  * inside an `Effect.cached` — once per isolate, on the first request that needs
  * it, and never at plan or deploy time.
  *
- * The tag is alchemy's `BetterAuth`, so the service contract (an `auth`
- * accessor plus a `fetch` `HttpEffect`) is the one alchemy's own integration
- * uses. Its `CloudflareD1` layer is deliberately not used: that layer declares a
- * D1 database of its own, which would put the auth tables in a second database —
- * no foreign key from `todos.user_id`, and a second migration path.
+ * The service contract — an `auth` accessor plus a `fetch` `HttpEffect` — is
+ * declared here rather than taken from alchemy. `@alchemy.run/better-auth`
+ * exports `BetterAuth` as a *constructor* that owns the instance, its database
+ * and its migrations; taking it would hand the auth tables to Better Auth's own
+ * Kysely migrator while `db/schema.ts` still declares them, so one schema would
+ * have two migration paths and `todos.user_id` would lose its foreign key
+ * (ADR 0020, ADR 0022).
+ *
+ * The return type is inferred rather than annotated, which is what carries
+ * Better Auth's `$Infer` through to `session.user` at the call site.
  */
-export const makeBetterAuth = (
-  options: BetterAuthOptions,
-): Effect.Effect<BetterAuth["Service"], Config.ConfigError> =>
+export const makeBetterAuth = (options: BetterAuthOptions) =>
   Effect.gen(function* () {
     // Resolved in the init phase so alchemy binds it as a secret on the Worker;
     // a `Config` first read inside a handler is never discovered and never bound.
@@ -143,3 +145,23 @@ export const makeBetterAuth = (
       }),
     };
   });
+
+/** What `makeBetterAuth` produces, inference intact. */
+export type BetterAuthService = Effect.Success<ReturnType<typeof makeBetterAuth>>;
+
+/**
+ * The instance, as a service. Built once per isolate by `makeBetterAuth` and
+ * handed over in `worker.ts`; the session middleware takes the tag rather than
+ * the instance so it stays substitutable (ADR 0022).
+ *
+ * `RuntimeContext` leaks into the method signatures on purpose, and cannot be
+ * resolved at layer creation the way the diagnostic asks: the D1 and R2 bindings
+ * behind Better Auth only exist while a request is in flight, so alchemy's Worker
+ * bridge is the only thing that can provide it, per event. `middleware.ts` erases
+ * it again with `RuntimeContext.phantom` so it never reaches `packages/api`.
+ *
+ * @effect-expect-leaking RuntimeContext
+ */
+export class BetterAuth extends Context.Service<BetterAuth, BetterAuthService>()(
+  "server/features/auth/auth/BetterAuth",
+) {}

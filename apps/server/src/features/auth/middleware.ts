@@ -1,8 +1,8 @@
-import { BetterAuth } from "@alchemy.run/better-auth";
 import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/auth/middleware";
 import { RuntimeContext } from "alchemy";
 import { Effect, Layer } from "effect";
 import { HttpServerRequest } from "effect/unstable/http";
+import { BetterAuth } from "./auth.ts";
 
 /**
  * Resolves the session cookie into `CurrentUser`. Better Auth runs outside the

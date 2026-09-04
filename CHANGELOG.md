@@ -54,6 +54,34 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Effect, drizzle and alchemy move to one rc version set.** `effect` and its
+  companions are `4.0.0-rc.112`, `@effect/tsgo` is `0.40.0`, `drizzle-orm` and
+  `drizzle-kit` are `1.0.0-rc.5-ab785fc`, and `alchemy` plus
+  `@alchemy.run/better-auth` are the pkg.ing build of merge commit `e05c734` —
+  [alchemy#1444](https://github.com/alchemy-run/alchemy/pull/1444) is merged but
+  unreleased. The three cannot move separately: that alchemy build pins
+  `effect >= 4.0.0-rc.112` and that exact drizzle sha. `scripts/vendor.sh`
+  re-vendors `repos/effect` and `repos/alchemy` to match, and now accepts a
+  40-character commit sha as a ref. See
+  [ADR 0027](docs/technical/adr/0027-the-rc-version-set-moves-in-lockstep.md).
+
+- **Domain errors are `Schema.TaggedError`**, not `Schema.TaggedErrorClass` —
+  effect beta.104 renamed it. `Unauthorized`, `TodoNotFound` and `TodosError`.
+
+- **`BetterAuth` is this repo's service tag**, declared in
+  `apps/server/src/features/auth/auth.ts`. `@alchemy.run/better-auth` now exports
+  `BetterAuth` as a constructor that owns its own database, secret and
+  migrations; adopting it would give the auth tables a second migration path
+  alongside `db/schema.ts` and cost `todos.user_id` its foreign key. The instance
+  is still hand-built by `makeBetterAuth`, whose return type is now inferred —
+  which is what carries Better Auth's `$Infer` through to `session.user`.
+
+- **The D1 database takes `migrations: schema`**, replacing `migrationsDir` and
+  `migrationsTable`. Bookkeeping is alchemy's `__alchemy_migrations` and is no
+  longer configurable; a database still carrying this stack's
+  `drizzle_migrations` ledger is adopted by a one-way conversion on the first
+  deploy, which copies the applied history across and freezes the old table.
+
 - **`cn` comes from [`cn`](https://github.com/shadcn-ui/cn)**, replacing
   `cnfast`. `packages/ui/src/lib/utils.ts` re-exports it, so
   `@xsblx/ui/lib/utils` is still the import path for components and for the

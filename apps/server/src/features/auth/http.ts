@@ -1,7 +1,7 @@
-import type { BetterAuth } from "@alchemy.run/better-auth";
 import type * as Cloudflare from "alchemy/Cloudflare";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import type { BetterAuthService } from "./auth.ts";
 
 /**
  * Better Auth ships its own web-standard `Request -> Response` handler, so it is
@@ -15,7 +15,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstab
  * handler is alchemy's `RuntimeContext`, which the Worker bridge provides per
  * event; that one is per-request by nature and cannot be provided any earlier.
  */
-export const authRoutes = (betterAuth: BetterAuth["Service"]) =>
+export const authRoutes = (betterAuth: BetterAuthService) =>
   HttpRouter.add("*", "/api/auth/*", betterAuth.fetch);
 
 /**

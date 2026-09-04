@@ -1,4 +1,3 @@
-import { BetterAuth } from "@alchemy.run/better-auth";
 import { Api } from "@xsblx/api/api";
 import * as Cloudflare from "alchemy/Cloudflare";
 // Subpath import: the `alchemy/Drizzle` barrel eagerly loads its MySQL and
@@ -12,7 +11,7 @@ import { ApiDomainConfig, CorsConfig, observability } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
-import { makeBetterAuth } from "./features/auth/auth.ts";
+import { BetterAuth, makeBetterAuth } from "./features/auth/auth.ts";
 import { assetRoutes, authRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
 import { HealthHandlers } from "./features/health/http.ts";
