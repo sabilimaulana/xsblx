@@ -1,7 +1,9 @@
 ---
 status: accepted
-version: 1.1.0
-updated: 2026-08-26
+version: 1.2.0
+updated: 2026-09-04
+amended-by:
+  - ./0026-effect-spans-in-cloudflares-waterfall.md
 supersedes:
   - ./0023-axiom-is-the-telemetry-sink.md
 amends:

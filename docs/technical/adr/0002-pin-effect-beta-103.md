@@ -1,7 +1,9 @@
 ---
-status: accepted
-version: 1.0.0
-updated: 2026-08-10
+status: superseded
+version: 1.1.0
+updated: 2026-09-04
+superseded-by:
+  - ./0027-the-rc-version-set-moves-in-lockstep.md
 ---
 
 # 0002 — Effect pinned to 4.0.0-beta.103

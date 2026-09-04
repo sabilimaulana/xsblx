@@ -1,7 +1,7 @@
 ---
 status: active
-version: 1.0.0
-updated: 2026-08-10
+version: 1.1.0
+updated: 2026-09-04
 ---
 
 # Architecture Decision Records
@@ -22,7 +22,7 @@ rule you obey on every edit? → `AGENTS.md`.
 | #    | Decision                                                                                                   | Status                             |
 | ---- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | 0001 | [Shared schemas live in `packages/api`](./0001-shared-schemas-in-packages-api.md)                          | accepted                           |
-| 0002 | [Effect pinned to 4.0.0-beta.103](./0002-pin-effect-beta-103.md)                                           | accepted                           |
+| 0002 | [Effect pinned to 4.0.0-beta.103](./0002-pin-effect-beta-103.md)                                           | superseded by 0027                 |
 | 0003 | [Services own SQL and domain errors](./0003-services-own-sql-and-domain-errors.md)                         | accepted                           |
 | 0004 | [Tests hit real Postgres](./0004-tests-hit-real-postgres.md)                                               | superseded by 0020                 |
 | 0005 | [Feature-first slices](./0005-feature-first-slices.md)                                                     | accepted                           |
@@ -43,8 +43,11 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0020 | [D1 is the database](./0020-d1-is-the-database.md)                                                         | accepted                           |
 | 0021 | [R2 holds generated assets](./0021-r2-holds-generated-assets.md)                                           | accepted                           |
 | 0022 | [Better Auth becomes a service on D1](./0022-better-auth-as-a-service-on-d1.md)                            | accepted, amended by 0024          |
-| 0023 | [Axiom is the telemetry sink](./0023-axiom-is-the-telemetry-sink.md)                                       | accepted                           |
+| 0023 | [Axiom is the telemetry sink](./0023-axiom-is-the-telemetry-sink.md)                                       | superseded by 0025                 |
 | 0024 | [Custom domains, first-party session cookie](./0024-custom-domains-make-the-session-cookie-first-party.md) | accepted                           |
+| 0025 | [Observability is Cloudflare-native](./0025-cloudflare-native-observability.md)                            | accepted, amended by 0026          |
+| 0026 | [Effect's spans go back into Cloudflare's waterfall](./0026-effect-spans-in-cloudflares-waterfall.md)      | accepted                           |
+| 0027 | [Effect, drizzle and alchemy move as one rc version set](./0027-the-rc-version-set-moves-in-lockstep.md)   | accepted                           |
 
 Template:
 
