@@ -45,12 +45,13 @@ is the filename (ADR 0005). `features/todos/` is the reference slice.
 bun install
 ./scripts/vendor.sh                  # reference sources into repos/ (effect, alchemy, …)
 cp .env.example .env                 # set AUTH_SECRET
-bun alchemy login                    # Cloudflare, then Axiom — stored in ~/.alchemy
+bun alchemy profile                  # Cloudflare credentials, stored in ~/.alchemy
 ```
 
-`alchemy login` walks one step per provider in the stack: Cloudflare (OAuth or an
-API token) and Axiom (`AXIOM_TOKEN` from the environment, or a token entered
-interactively). Neither credential belongs in `.env`.
+`alchemy profile` walks one step per provider in the stack, which is Cloudflare
+alone — OAuth, or an API token. The credential does not belong in `.env`.
+`alchemy profile refresh --profile default --provider Cloudflare` re-authorises
+an expired one.
 
 `.env` is read by `alchemy`, not by an app: a `Config` value a Worker resolves in
 its init phase is bound onto the deployed Worker as a secret, so `AUTH_SECRET`
@@ -68,13 +69,15 @@ bun run dev          # alchemy dev: Vite + HMR on :3001, bindings on real resour
 bun run plan         # diff the stack against recorded state
 bun run deploy       # generate migrations, apply them, upload both Workers
 bun run destroy      # remove the stage
-bun run tail         # stream Worker logs
+bun run tail         # stream Worker logs (alchemy logs --tail)
 ```
 
 `alchemy dev` binds the **real** D1 database and R2 bucket, so there is no
 emulator to disagree with production — and no offline path. Stages keep that
-honest: `--stage <name>` gets its own database, bucket and Workers, and the
-default is `dev_$USER`.
+honest: `--stage <name>` gets its own database, bucket and Workers. The scripts
+pin `dev_$USER`, because `alchemy deploy`, `plan` and `destroy` default to
+`live_$USER` while `alchemy dev` defaults to `dev_$USER` — left implicit, the two
+halves of the loop would target different infrastructure.
 
 ## Checks
 

@@ -63,6 +63,20 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Every alchemy script but `dev` pins `--stage dev_$USER`.** This alchemy build
+  defaults `deploy`, `plan` and `destroy` to `live_$USER` while `alchemy dev`
+  still defaults to `dev_$USER`; unpinned, `bun run dev` and `bun run deploy`
+  would target different infrastructure and the first deploy would silently build
+  a second D1 database, R2 bucket and Worker pair. `deploy:prod` names `prod`
+  explicitly and was never exposed.
+
+- **`bun run tail` is `alchemy logs --tail`.** `alchemy tail` was renamed and now
+  exits non-zero with a pointer, as did `alchemy login`, which is
+  `alchemy profile`. The upgrade also migrates alchemy's profile storage layout
+  and drops stored Cloudflare credentials — re-authorise with
+  `alchemy profile refresh --profile default --provider Cloudflare`. README's
+  setup step also loses its Axiom half, stale since ADR 0025.
+
 - **Better Auth is `1.7.2`**, off the `1.7.0-rc.4` prerelease, along with
   `@better-auth/drizzle-adapter`. This also clears the install warning ADR 0022
   recorded: `@alchemy.run/better-auth` declares `better-auth@^1.6.2`, and a

@@ -39,8 +39,8 @@ together with `repos/alchemy`.
 Configuration is one root `.env` (template `.env.example`), because `alchemy` is
 what reads it: a `Config` value resolved in a Worker's init phase is bound onto
 the deployed Worker as a secret. Two variables matter — `AUTH_SECRET` and
-`CORS_ALLOWED_ORIGINS`. Cloudflare credentials are not in it; `alchemy login`
-stores them in `~/.alchemy/profiles.json`, and CI passes
+`CORS_ALLOWED_ORIGINS`. Cloudflare credentials are not in it; `alchemy profile`
+stores them under `~/.alchemy`, and CI passes
 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` instead.
 
 ## The deploy
@@ -65,7 +65,13 @@ both edges would make the two Workers a cycle in the deploy graph.
 | `bun run plan`    | diff the stack against recorded state                   |
 | `bun run deploy`  | generate migrations, apply them, upload both Workers    |
 | `bun run destroy` | remove everything in the stage                          |
-| `bun run tail`    | stream Worker logs                                      |
+| `bun run tail`    | stream Worker logs (`alchemy logs --tail`)              |
+
+Every script but `dev` pins `--stage dev_$USER`. `alchemy deploy`, `plan` and
+`destroy` default to `live_$USER` in this alchemy build while `alchemy dev`
+defaults to `dev_$USER`; unpinned, `bun run dev` and `bun run deploy` would
+target different infrastructure. `deploy:prod` names `prod` explicitly and is
+unaffected.
 
 ## Import paths
 
