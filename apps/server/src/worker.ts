@@ -63,11 +63,25 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
   // than dropping spans quietly. It also clears 2026-08-04, from which
   // `nodejs_compat` is on by default, and the tracer imports `node:async_hooks`
   // (ADR 0026).
+  //
+  // `env` carries one value and it is a tombstone, not configuration.
+  // `ALCHEMY_OTEL_EXPORTERS` is alchemy's own binding for OTLP destinations,
+  // and a stale Axiom one survived the migration off it (ADR 0025): the layer
+  // reads any bound destination as "an implicit extra destination", so every
+  // invocation POSTed metrics to `api.axiom.co/v1/metrics` and got a 403 from
+  // the revoked token — ~780ms of wall time per request, buying nothing. The
+  // binding is orphaned rather than wrong: nothing declares it any more, so
+  // `alchemy deploy --force` leaves it and a Cloudflare settings PATCH reports
+  // success without changing it. Declaring it here is what puts it back under
+  // the deploy's control; an empty list resolves to `Layer.empty` and the
+  // exporter is never built. Delete this once alchemy prunes bindings it no
+  // longer declares.
   {
     main: import.meta.url,
     domain: ApiDomainConfig,
     observability: apiObservability,
     compatibility: { date: "2026-08-25" },
+    env: { ALCHEMY_OTEL_EXPORTERS: "[]" },
   },
   Effect.gen(function* () {
     const cors = yield* CorsConfig;

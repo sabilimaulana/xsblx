@@ -95,6 +95,15 @@ no OTLP endpoint.
 - **Do not add a `Metric`.** The telemetry layer provides a `Tracer` and nothing
   else, so a counter still has no reader and is dead code. A metric returns when
   there is a sink for it (ADR 0025).
+- **A clean source tree does not mean a clean Worker.** A binding the program no
+  longer declares is *orphaned*, not removed: `deploy` noops it, `--force` skips
+  it because force only rebinds declared bindings, and a settings `PATCH` with
+  an `inherit` list reports success without touching it. That is how a revoked
+  Axiom exporter kept costing every request ~780ms for four months after ADR
+  0025 deleted it. Removing telemetry means re-declaring the binding with an
+  inert value and forcing a deploy per stage, then verifying against
+  `GET /accounts/{account}/workers/scripts/{name}/settings` — never against the
+  source.
 - **Leave `traces.propagationPolicy` at its default.** `"accept"` adopts a
   caller's inbound `traceparent` as Cloudflare's own trace id, which makes the
   trace id forgeable by anyone who can call the API.

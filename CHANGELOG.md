@@ -9,6 +9,17 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The API Workers stopped exporting to Axiom on every request.** Both carried
+  an orphaned `ALCHEMY_OTEL_EXPORTERS` binding holding the destination ADR 0025
+  removed, so each invocation POSTed metrics to `api.axiom.co` and took a `403`
+  from the revoked token — ~780ms of wall time per request, and every trace read
+  25x its real duration. `apps/server/src/worker.ts` now declares
+  `env: { ALCHEMY_OTEL_EXPORTERS: "[]" }`, which re-takes control of the binding
+  and resolves the exporter to `Layer.empty`. Each stage needs one forced deploy;
+  dev is done, prod is not.
+
 ### Added
 
 - **The two paths every request goes through now have spans of their own.**

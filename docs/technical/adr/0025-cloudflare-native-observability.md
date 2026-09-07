@@ -160,6 +160,47 @@ again**, and the symptom is the `MissingProviderError` above rather than a
 missing dataset. Check with `alchemy state resources --stack xsblx --stage
 <name>` before assuming a stage is clean.
 
+## The migration left a binding behind
+
+Verified on 2026-09-07, against the deployed dev and prod API Workers.
+
+Deleting the declarations and destroying the datasets did not stop the export.
+Both API Workers still carried `ALCHEMY_OTEL_EXPORTERS` — alchemy's own binding
+for OTLP destinations — holding the Axiom destination this ADR removed. The
+telemetry layer reads any bound destination as *"an implicit extra destination,
+so platform-injected OTLP config exports without any layer"*, so every request
+POSTed metrics to `https://api.axiom.co/v1/metrics` and took a `403` from the
+revoked token: ~780ms of invocation wall time, on every request, in prod,
+delivering nothing. It does not delay the response — the flush happens at
+request-scope close, after the response is delivered — so client latency stayed
+at ~40ms and nothing looked wrong. What it did corrupt was every trace: a
+`GET /health` root span read 730-1200ms against ~30ms of real work.
+
+**Why nothing caught it.** The binding was *orphaned*, not wrong. Nothing in the
+program declared it any more, so:
+
+- the source was clean, and grep found nothing;
+- `alchemy deploy` reported `noop` — a secret value is invisible to the differ;
+- `alchemy deploy --force` left it in place, because force rebinds *declared*
+  bindings and this one no longer was;
+- a Cloudflare `PATCH /workers/scripts/{name}/settings` carrying an `inherit`
+  list returned `success: true` and changed nothing.
+
+**The fix is to re-declare it.** `apps/server/src/worker.ts` sets
+`env: { ALCHEMY_OTEL_EXPORTERS: "[]" }`, which puts the binding back under the
+deploy's control and resolves to `Layer.empty`, so the exporter is never built.
+It flips from `secret_text` to `plain_text = "[]"` on the next `--force` deploy,
+and every stage picks it up from the same declaration rather than a manual poke
+per Worker. Delete the line once alchemy prunes bindings it no longer declares.
+
+**A deploy alone does not close this out.** Each stage needs one forced deploy
+(`bun run deploy:prod --force` for prod), and the check is the Worker's own
+settings, not the source:
+
+```
+GET /accounts/{account}/workers/scripts/{name}/settings  →  bindings[]
+```
+
 ## Consequences
 
 - **A trace stops at the platform boundary.** The depth is `fetch → D1 query`,
@@ -183,9 +224,14 @@ missing dataset. Check with `alchemy state resources --stack xsblx --stage
   console output is attributed to the active platform span by the runtime, which
   works precisely because we are no longer trying to run a second trace context
   alongside it.
-- **Instrumentation is free again.** No OTLP serialisation, no subrequest per
-  signal, no `ctx.waitUntil` flush, no bearer token on the Worker. The only
-  credential it now carries is `AUTH_SECRET`.
+- **Instrumentation is free again** — but only after the correction below. No
+  OTLP serialisation, no subrequest per signal, no `ctx.waitUntil` flush, no
+  bearer token on the Worker. The only credential it now carries is
+  `AUTH_SECRET`.
+
+  This was written as a claim about the source, and for four months it was false
+  of the deployed Workers. Both API Workers kept exporting to Axiom on every
+  invocation. See "The migration left a binding behind" below.
 - **Nothing alerts, still.** Unchanged from ADR 0023, with a different vendor:
   Cloudflare Notifications is the un-declared half, and it needs the same
   undecided answer about who gets paged.
