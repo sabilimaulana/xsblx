@@ -17,8 +17,9 @@ in an ADR, not here — link it.
   from the revoked token — ~780ms of wall time per request, and every trace read
   25x its real duration. `apps/server/src/worker.ts` now declares
   `env: { ALCHEMY_OTEL_EXPORTERS: "[]" }`, which re-takes control of the binding
-  and resolves the exporter to `Layer.empty`. Each stage needs one forced deploy;
-  dev is done, prod is not.
+  and resolves the exporter to `Layer.empty`. Each stage needs one forced deploy
+  to pick it up; dev and prod are both done, and both now report the binding as
+  `plain_text = "[]"` with no `api.axiom.co` span left in either.
 
 ### Added
 
