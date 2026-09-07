@@ -93,6 +93,9 @@ export class Todos extends Context.Service<
         const hasMore = rows.length > page.limit;
         const items = (hasMore ? rows.slice(0, page.limit) : rows).map(toDomain);
         const last = items[items.length - 1];
+        // `limit` alone does not say whether the page filled or whether keyset
+        // paging is being exercised at all.
+        yield* Effect.annotateCurrentSpan({ count: items.length, hasMore });
         return TodoPage.make({
           items,
           nextCursor: hasMore && last !== undefined ? todoCursor(last) : null,
@@ -109,7 +112,12 @@ export class Todos extends Context.Service<
           .pipe(Effect.orDie);
         const row = rows[0];
         if (row === undefined) {
-          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
+          const reason = TodoNotFound.make({ id });
+          // The tracer collapses every failure into `effect.exit: "failure"`, so
+          // the reason is only in the trace if it is an attribute. `_tag` rather
+          // than a literal: a renamed reason renames the attribute with it.
+          yield* Effect.annotateCurrentSpan("errorReason", reason._tag);
+          return yield* TodosError.make({ reason });
         }
         return toDomain(row);
       });
@@ -131,6 +139,9 @@ export class Todos extends Context.Service<
         id: TodoId,
         input: { readonly title?: string | undefined; readonly completed?: boolean | undefined },
       ) {
+        // Which fields the patch touched, not their values — a title is user
+        // content and a span attribute is not the place for it.
+        yield* Effect.annotateCurrentSpan({ id, fields: Object.keys(input).join(",") });
         const rows = yield* db
           .update(todos)
           .set(input)
@@ -139,19 +150,27 @@ export class Todos extends Context.Service<
           .pipe(Effect.orDie);
         const row = rows[0];
         if (row === undefined) {
-          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
+          const reason = TodoNotFound.make({ id });
+          // The tracer collapses every failure into `effect.exit: "failure"`, so
+          // the reason is only in the trace if it is an attribute. `_tag` rather
+          // than a literal: a renamed reason renames the attribute with it.
+          yield* Effect.annotateCurrentSpan("errorReason", reason._tag);
+          return yield* TodosError.make({ reason });
         }
         return toDomain(row);
       });
 
       const remove = Effect.fn("Todos.remove")(function* (userId: string, id: TodoId) {
+        yield* Effect.annotateCurrentSpan({ id });
         const rows = yield* db
           .delete(todos)
           .where(owned(userId, id))
           .returning({ id: todos.id })
           .pipe(Effect.orDie);
         if (rows.length === 0) {
-          return yield* TodosError.make({ reason: TodoNotFound.make({ id }) });
+          const reason = TodoNotFound.make({ id });
+          yield* Effect.annotateCurrentSpan("errorReason", reason._tag);
+          return yield* TodosError.make({ reason });
         }
       });
 

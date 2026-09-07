@@ -40,6 +40,7 @@ export const assetRoutes = (assets: Cloudflare.R2.ReadBucketClient) =>
       if (!ASSET_KEY.test(key)) {
         return HttpServerResponse.empty({ status: 404 });
       }
+      yield* Effect.annotateCurrentSpan("key", key);
       const object = yield* assets.get(key);
       if (object === null) {
         return HttpServerResponse.empty({ status: 404 });
@@ -51,5 +52,6 @@ export const assetRoutes = (assets: Cloudflare.R2.ReadBucketClient) =>
     }).pipe(
       // A failed read is infrastructure, not a route outcome.
       Effect.orDie,
+      Effect.withSpan("Assets.get"),
     ),
   );

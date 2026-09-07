@@ -135,6 +135,14 @@ export const makeBetterAuth = (options: BetterAuthOptions) =>
       auth: instance,
       fetch: Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
+        // The pathname is what distinguishes sign-up (which also writes an
+        // avatar to R2) from sign-in from a session refresh. Only the pathname:
+        // some Better Auth flows carry a token in the query string, and a span
+        // attribute is not the place for one.
+        yield* Effect.annotateCurrentSpan(
+          "authPath",
+          new URL(request.url, "http://auth.invalid").pathname,
+        );
         const auth = yield* instance;
         const response = yield* Effect.promise(() => auth.handler(request.source as Request));
         // `fromWeb` splits the response's `set-cookie` values with
@@ -142,7 +150,7 @@ export const makeBetterAuth = (options: BetterAuthOptions) =>
         // headers into a record instead would merge them into one broken
         // cookie, which is the failure ADR 0007 exists to prevent.
         return HttpServerResponse.fromWeb(response);
-      }),
+      }).pipe(Effect.withSpan("Auth.handler")),
     };
   });
 

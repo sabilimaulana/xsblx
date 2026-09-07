@@ -11,6 +11,21 @@ in an ADR, not here — link it.
 
 ### Added
 
+- **The two paths every request goes through now have spans of their own.**
+  `Auth.session` covers resolving the session cookie into `CurrentUser` — a
+  signature check or a D1 lookup, depending on the cookie cache — and annotates
+  the owner's `userId`. `Auth.handler` covers all of `/api/auth/*` and annotates
+  the pathname, so sign-up is told apart from sign-in in the waterfall.
+  `Assets.get` covers the R2 read behind `GET /public/*`. `Todos.update` and
+  `Todos.remove` gained the attributes `list` and `getById` already had (ADR
+  0026).
+- **A failed span now says why it failed.** The tracer reports completion as
+  `effect.exit: "failure"` and nothing more, so the reason is recorded as an
+  attribute: `errorReason` on the `Todos` methods that can fail, and
+  `outcome: "no-session"` on `Auth.session`, which is what separates an ordinary
+  anonymous request from auth being broken. `Todos.list` also records `count`
+  and `hasMore`, so a page's shape is visible next to its `limit`.
+
 - **Effect's spans are back in the trace, inside Cloudflare's own waterfall.**
   The API Worker provides `Cloudflare.Telemetry({ headSamplingRate: 1 })`, which
   installs a per-event Effect `Tracer` over `tracing.startActiveSpan` — so
