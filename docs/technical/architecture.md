@@ -1,7 +1,7 @@
 ---
 status: active
-version: 2.1.0
-updated: 2026-08-26
+version: 2.2.0
+updated: 2026-09-10
 ---
 
 # Architecture
@@ -32,15 +32,17 @@ Worker is part of the same dev session.
 Shared dependency versions live in the root `package.json` catalogs, not in each
 workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss,
 drizzle), `catalog:effect` for `effect`, `@effect/sql-d1`, the platform packages
-and `@effect/vitest`, which must stay on the same beta version (ADR 0002), and
+and `@effect/vitest`, which move as one version set (ADR 0027),
 `catalog:alchemy` for `alchemy` and `@alchemy.run/better-auth`, which move
-together with `repos/alchemy`.
+together with `repos/alchemy`, and `catalog:auth` for `better-auth`.
 
-Configuration is one root `.env` (template `.env.example`), because `alchemy` is
-what reads it: a `Config` value resolved in a Worker's init phase is bound onto
-the deployed Worker as a secret. Two variables matter — `AUTH_SECRET` and
-`CORS_ALLOWED_ORIGINS`. Cloudflare credentials are not in it; `alchemy profile`
-stores them under `~/.alchemy`, and CI passes
+Configuration is one root `.env` (template `.env.example`), with per-stage
+overrides in `.env.<stage>.local` passed via `--env-file` (ADR 0024), because
+`alchemy` is what reads them: a `Config` value resolved in a Worker's init phase
+is bound onto the deployed Worker as a secret. Every stage sets `AUTH_SECRET`
+and `CORS_ALLOWED_ORIGINS`; a stage on custom domains adds `API_DOMAIN`,
+`WEB_DOMAIN` and `SESSION_COOKIE_SAMESITE`. Cloudflare credentials are in
+neither file; `alchemy profile` stores them under `~/.alchemy`, and CI passes
 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` instead.
 
 ## The deploy
@@ -92,16 +94,16 @@ the layer is the filename (ADR 0005).
 | Layer          | File                                             | Responsibility                                                                              |
 | -------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | Domain         | `packages/api/src/features/todos/schema.ts`      | `Schema.Class` + branded id. No IO, no framework types.                                     |
-| Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedErrorClass` per case, plus one `TodosError` wrapper holding them in `reason`. |
+| Domain errors  | `packages/api/src/features/todos/errors.ts`      | `Schema.TaggedError` per case, plus one `TodosError` wrapper holding them in `reason`.      |
 | API definition | `packages/api/src/features/todos/group.ts`       | `HttpApiGroup` — paths, params, payloads, declared errors. No handler logic.                |
 | API root       | `packages/api/src/api.ts`                        | Composes every group into `Api`.                                                            |
 | Persistence    | `apps/server/src/features/todos/schema.ts`       | Drizzle `sqliteTable`. Migrations are generated and applied by `alchemy deploy` (ADR 0020). |
 | Service        | `apps/server/src/features/todos/service.ts`      | `Context.Service` + `Layer`. Owns business rules and SQL; maps rows to domain types.        |
 | Handlers       | `apps/server/src/features/todos/http.ts`         | `HttpApiBuilder.group` — translates HTTP ↔ domain and nothing else.                         |
-| Wiring         | `apps/server/src/index.ts`                       | Provides handler layers to the server.                                                      |
+| Wiring         | `apps/server/src/worker.ts`                      | Binds resources, assembles the router from the handler layers.                              |
 | Client         | `apps/web/src/lib/api-client.ts`                 | `HttpApiClient` over the shared `Api`, a `ManagedRuntime`, and the `effect-query` bridge.   |
 | UI             | `apps/web/src/routes/_protected/todos.tsx`       | `useInfiniteQuery` pages, TanStack Form submits, `invalidateQueries` refetches.             |
-| Test           | `apps/server/src/features/todos/service.test.ts` | `@effect/vitest` `layer(...)` integration test against real Postgres.                       |
+| E2E test       | `apps/server/src/features/todos/todos.e2e.test.ts` | Deploys the stack with alchemy's `Test` harness and drives the real API.                  |
 | Contract test  | `apps/server/src/features/todos/http.test.ts`    | Decodes the endpoint's built query schema — defaults, bounds, string parsing. No database.  |
 
 Central by necessity, not feature-folded:
@@ -137,7 +139,7 @@ than a module singleton (ADR 0022).
 
 | Layer     | File                                            | Responsibility                                                                                                             |
 | --------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Service   | `apps/server/src/features/auth/auth.ts`         | `layerBetterAuth` — alchemy's `BetterAuth` tag, built once per isolate inside `Effect.cached` from the D1 and R2 bindings. |
+| Service   | `apps/server/src/features/auth/auth.ts`         | `makeBetterAuth` — builds the `BetterAuth` service once per isolate inside `Effect.cached` from the D1 and R2 bindings. |
 | Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                                                                |
 | Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.                                                     |
 | Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`, plus `GET /public/*` for assets.                                                  |
@@ -225,7 +227,7 @@ What each signal is:
   so there is still no sink for a `Metric` and therefore no `Metric` —
   `todos_created_total` went with the exporter.
 
-`traces.propagationPolicy` is left at its default `"authenticated"`. `"accept"`
+`traces.propagationPolicy` is left at its default. `"accept"`
 would adopt a caller's inbound `traceparent` as Cloudflare's trace id, which
 makes the trace id forgeable by anyone who can reach the API. The CORS
 allow-list still carries `traceparent` and `b3` regardless — Effect's
@@ -351,5 +353,5 @@ files at pre-commit; hooks install via the root `prepare` script.
   website Worker would delete that surface — and add an SSR hop to every call.
 - **Local development needs the cloud.** `alchemy dev` binds real D1 and R2, so
   there is no offline path and no emulator (ADR 0019).
-- **Effect is pinned to a beta, and now alchemy is too** (ADR 0002, ADR 0019).
+- **Effect is pinned to a beta, and now alchemy is too** (ADR 0027, ADR 0019).
   They move together with the vendored sources in `repos/`.
