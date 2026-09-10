@@ -13,7 +13,7 @@ The whole deploy is one alchemy program (ADR 0019).
 | Layer     | Choice                                                                |
 | --------- | --------------------------------------------------------------------- |
 | Runtime   | Bun workspaces; Cloudflare Workers in production                      |
-| Infra     | `alchemy` `2.0.0-beta.70` — infrastructure as an Effect program       |
+| Infra     | `alchemy` `2.0.0-beta.77` — infrastructure as an Effect program       |
 | Backend   | Effect `4.0.0-beta.103`, `HttpApi`, `@effect/sql-d1` over a binding   |
 | Database  | Cloudflare D1 via `drizzle-orm/sqlite-core` (ADR 0020)                |
 | Storage   | Cloudflare R2, one bucket, `public/*` served by the Worker (ADR 0021) |

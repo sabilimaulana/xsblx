@@ -17,7 +17,7 @@ Cloudflare through one alchemy stack (ADR 0019).
 
 | Path             | Stack                                                                          | Deploys as                |
 | ---------------- | ------------------------------------------------------------------------------ | ------------------------- |
-| `alchemy.run.ts` | alchemy 2 (commit `e05c734`) — the whole deploy as one Effect program          | the stack itself          |
+| `alchemy.run.ts` | alchemy 2 (`2.0.0-beta.77`) — the whole deploy as one Effect program         | the stack itself          |
 | `apps/server`    | Effect 4 (rc.112), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding     | `Cloudflare.Worker`       |
 | `apps/web`       | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                   | `Cloudflare.Website.Vite` |
 | `packages/api`   | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`) | —                         |

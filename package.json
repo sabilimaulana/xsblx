@@ -22,8 +22,8 @@
     },
     "catalogs": {
       "alchemy": {
-        "@alchemy.run/better-auth": "https://pkg.ing/@alchemy.run/better-auth/e05c734ea30625efd07a443cef267bfde225f5b4",
-        "alchemy": "https://pkg.ing/alchemy/e05c734ea30625efd07a443cef267bfde225f5b4"
+        "@alchemy.run/better-auth": "2.0.0-beta.77",
+        "alchemy": "2.0.0-beta.77"
       },
       "auth": {
         "@better-auth/drizzle-adapter": "1.7.2",

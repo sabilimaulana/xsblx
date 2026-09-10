@@ -12,8 +12,8 @@ cd "$(dirname "$0")/.."
 # name|github repo|ref (a tag, or a 40-character commit sha)
 VENDORED=(
   "effect|Effect-TS/effect|effect@4.0.0-rc.112"
-  # Pinned to a commit, not a tag: alchemy#1444 is unreleased (ADR 0027).
-  "alchemy|alchemy-run/alchemy|e05c734ea30625efd07a443cef267bfde225f5b4"
+  # Pinned to the first release containing alchemy#1444 (ADR 0027).
+  "alchemy|alchemy-run/alchemy|v2.0.0-beta.77"
   "effect-query|voidhashcom/effect-query|v1.0.4"
   "better-auth|better-auth/better-auth|v1.7.2"
   "effect-machine|typeonce-dev/effect-machine|@typeonce/effect-machine@0.3.0"

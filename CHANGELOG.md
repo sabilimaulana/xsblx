@@ -90,6 +90,15 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Alchemy is `2.0.0-beta.77`, off the pkg.ing commit pin.** Beta.77 is the
+  first release containing
+  [alchemy#1444](https://github.com/alchemy-run/alchemy/pull/1444), so `alchemy`
+  and `@alchemy.run/better-auth` move from the pkg.ing build of merge commit
+  `e05c734` back to a semver version, and `scripts/vendor.sh` vendors
+  `repos/alchemy` from tag `v2.0.0-beta.77`. Effect (`4.0.0-rc.112`) and drizzle
+  (`1.0.0-rc.5-ab785fc`) stay put: beta.77 peers exactly that set. See
+  [ADR 0027](docs/technical/adr/0027-the-rc-version-set-moves-in-lockstep.md).
+
 - **Every alchemy script but `dev` pins `--stage dev_$USER`.** This alchemy build
   defaults `deploy`, `plan` and `destroy` to `live_$USER` while `alchemy dev`
   still defaults to `dev_$USER`; unpinned, `bun run dev` and `bun run deploy`

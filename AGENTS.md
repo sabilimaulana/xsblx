@@ -238,11 +238,11 @@ pointed at the real cloud resources.
   value bound.
 - **Hostnames are never derived from the stage name.** The default stage is
   `dev_$USER`, and an underscore is not legal in a hostname (ADR 0024).
-- **`alchemy` is pinned to a commit, not a release** — merge commit `e05c734`,
-  installed from pkg.ing, because PR 1444 is unreleased (ADR 0027). The same sha
-  is what `scripts/vendor.sh` fetches. Bump the dependency and the vendored
-  source together, never one alone, the way `effect` and `repos/effect` already
-  move — and remember `@alchemy.run/better-auth` is pinned to the same sha.
+- **`alchemy` is pinned to `2.0.0-beta.77`** — the first release containing PR
+  1444 (ADR 0027). The same version is what `scripts/vendor.sh` fetches. Bump
+  the dependency and the vendored source together, never one alone, the way
+  `effect` and `repos/effect` already move — and remember
+  `@alchemy.run/better-auth` moves with `alchemy` in the same catalog.
 - **Paths depend on whether the Worker bundles the file.** `alchemy` runs from
   the workspace root, so a bare relative path resolves against the root, not
   against the declaring file. Two cases, and mixing them up breaks production:
