@@ -90,6 +90,9 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **The version set moves to alchemy `2.0.0-beta.78`, effect `4.0.0-rc.115` and vitest 5.** Beta.78 requires `effect >= 4.0.0-rc.115`, and `@effect/vitest` at rc.115 requires `vitest >= 5 < 6`, so `vitest` in `apps/server` goes `^4.1.10` → `^5.0.1` and `@effect/tsgo` goes `0.40.0` → `0.45.0`. Drizzle stays at `1.0.0-rc.5-ab785fc`, which beta.78 still pins exactly. Effect rc.113 renamed the `Config` constructors to PascalCase — `Config.redacted` → `Config.Redacted`, `Config.nonEmptyString` → `Config.NonEmptyString`, `Config.literals` → `Config.Literals` — across three call sites in `apps/server`. `scripts/vendor.sh` re-vendors `repos/effect` from `effect@4.0.0-rc.115` and `repos/alchemy` from `v2.0.0-beta.78`, and the e2e harness now deploys to a `test_$USER` stage by default. See
+  [ADR 0028](docs/technical/adr/0028-the-version-set-takes-beta-78-and-vitest-5.md).
+
 - **Alchemy is `2.0.0-beta.77`, off the pkg.ing commit pin.** Beta.77 is the
   first release containing
   [alchemy#1444](https://github.com/alchemy-run/alchemy/pull/1444), so `alchemy`

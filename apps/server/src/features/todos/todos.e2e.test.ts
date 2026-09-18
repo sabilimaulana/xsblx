@@ -13,7 +13,7 @@ import Stack from "../../../../../alchemy.run.ts";
  * The integration test for a D1-backed service is an end-to-end test against a
  * deployed stage (ADR 0020): a D1 binding only exists inside a Worker, so there
  * is no off-platform database for a service test to point at. This file deploys
- * the stack to the `test` stage, drives the real API over HTTP with the same
+ * the stack to a `test_$USER` stage, drives the real API over HTTP with the same
  * typed client the web app uses, and destroys it again.
  *
  * It therefore needs Cloudflare credentials and is excluded from `bun run test`.

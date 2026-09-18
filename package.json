@@ -22,19 +22,19 @@
     },
     "catalogs": {
       "alchemy": {
-        "@alchemy.run/better-auth": "2.0.0-beta.77",
-        "alchemy": "2.0.0-beta.77"
+        "@alchemy.run/better-auth": "2.0.0-beta.78",
+        "alchemy": "2.0.0-beta.78"
       },
       "auth": {
         "@better-auth/drizzle-adapter": "1.7.2",
         "better-auth": "1.7.2"
       },
       "effect": {
-        "@effect/platform-bun": "4.0.0-rc.112",
-        "@effect/platform-node": "4.0.0-rc.112",
-        "@effect/sql-d1": "4.0.0-rc.112",
-        "@effect/vitest": "4.0.0-rc.112",
-        "effect": "4.0.0-rc.112"
+        "@effect/platform-bun": "4.0.0-rc.115",
+        "@effect/platform-node": "4.0.0-rc.115",
+        "@effect/sql-d1": "4.0.0-rc.115",
+        "@effect/vitest": "4.0.0-rc.115",
+        "effect": "4.0.0-rc.115"
       }
     }
   },
@@ -58,7 +58,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@effect/platform-bun": "catalog:effect",
     "@effect/platform-node": "catalog:effect",
-    "@effect/tsgo": "0.40.0",
+    "@effect/tsgo": "0.45.0",
     "@types/bun": "latest",
     "alchemy": "catalog:alchemy",
     "drizzle-kit": "catalog:",

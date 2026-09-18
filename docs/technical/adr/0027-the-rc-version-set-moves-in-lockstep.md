@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 version: 1.0.0
 updated: 2026-09-04
+superseded-by: ./0028-the-version-set-takes-beta-78-and-vitest-5.md
 supersedes:
   - ./0002-pin-effect-beta-103.md
 ---

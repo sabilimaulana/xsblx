@@ -13,7 +13,7 @@ import { Config, Option } from "effect";
  * a cycle in the deploy graph.
  */
 export const CorsConfig = Config.all({
-  allowedOrigins: Config.nonEmptyString("CORS_ALLOWED_ORIGINS").pipe(
+  allowedOrigins: Config.NonEmptyString("CORS_ALLOWED_ORIGINS").pipe(
     Config.withDefault("http://localhost:3001"),
     Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
   ),
@@ -33,7 +33,7 @@ export const CorsConfig = Config.all({
  * what `VITE_API_URL` inlines.
  */
 const domain = (name: string) =>
-  Config.option(Config.nonEmptyString(name)).pipe(Config.map(Option.getOrUndefined));
+  Config.option(Config.NonEmptyString(name)).pipe(Config.map(Option.getOrUndefined));
 
 export const ApiDomainConfig = domain("API_DOMAIN");
 
@@ -53,7 +53,7 @@ export const WebDomainConfig = domain("WEB_DOMAIN");
  * `lax` direction silently signs everyone out.
  */
 export const SessionCookieConfig = Config.all({
-  sameSite: Config.literals(["lax", "none"], "SESSION_COOKIE_SAMESITE").pipe(
+  sameSite: Config.Literals(["lax", "none"], "SESSION_COOKIE_SAMESITE").pipe(
     Config.withDefault("none" as const),
   ),
 });

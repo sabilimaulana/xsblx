@@ -1,7 +1,7 @@
 ---
 status: active
-version: 2.2.0
-updated: 2026-09-10
+version: 2.3.0
+updated: 2026-09-18
 ---
 
 # Architecture
@@ -17,8 +17,8 @@ Cloudflare through one alchemy stack (ADR 0019).
 
 | Path             | Stack                                                                          | Deploys as                |
 | ---------------- | ------------------------------------------------------------------------------ | ------------------------- |
-| `alchemy.run.ts` | alchemy 2 (`2.0.0-beta.77`) — the whole deploy as one Effect program         | the stack itself          |
-| `apps/server`    | Effect 4 (rc.112), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding     | `Cloudflare.Worker`       |
+| `alchemy.run.ts` | alchemy 2 (`2.0.0-beta.78`) — the whole deploy as one Effect program         | the stack itself          |
+| `apps/server`    | Effect 4 (rc.115), `HttpApi`, drizzle + `@effect/sql-d1` over a D1 binding     | `Cloudflare.Worker`       |
 | `apps/web`       | TanStack Start + Query + Form (React 19, Vite 8, Tailwind 4)                   | `Cloudflare.Website.Vite` |
 | `packages/api`   | Domain schemas + `HttpApi` definition, shared by server and web (`@xsblx/api`) | —                         |
 | `packages/ui`    | shadcn `base-nova` preset (Base UI + Nova theme), published as `@xsblx/ui`     | —                         |
@@ -32,7 +32,7 @@ Worker is part of the same dev session.
 Shared dependency versions live in the root `package.json` catalogs, not in each
 workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss,
 drizzle), `catalog:effect` for `effect`, `@effect/sql-d1`, the platform packages
-and `@effect/vitest`, which move as one version set (ADR 0027),
+and `@effect/vitest`, which move as one version set (ADR 0028),
 `catalog:alchemy` for `alchemy` and `@alchemy.run/better-auth`, which move
 together with `repos/alchemy`, and `catalog:auth` for `better-auth`.
 

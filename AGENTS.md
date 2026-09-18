@@ -48,12 +48,14 @@ another library for anything Effect already provides.
 
 - **Read `repos/effect/LLMS.md` before writing any Effect code.** `repos/effect/`
   is the API source of truth, vendored at the exact runtime version.
-- **Effect is `4.0.0-rc.112`, and it moves only as part of one version set:
+- **Effect is `4.0.0-rc.115`, and it moves only as part of one version set:
   effect + `@effect/*` + `@effect/tsgo` + `drizzle-orm`/`drizzle-kit` +
-  `alchemy`** (ADR 0027). The alchemy build pins the effect floor and the exact
+  `alchemy`** (ADR 0028). The alchemy build pins the effect floor and the exact
   drizzle sha, so bumping one alone does not install. Consequences that bite
   daily: errors are `Schema.TaggedError<Self>()(tag, fields, annotations)` —
-  renamed from `Schema.TaggedErrorClass` in beta.104 — and drizzle queries are
+  renamed from `Schema.TaggedErrorClass` in beta.104 — `Config` constructors are
+  PascalCase (`Config.String`, `Config.Redacted`, `Config.Literals`) since rc.113,
+  and drizzle queries are
   Effects failing with `SqlError`, so `Effect.orDie` them in services rather
   than widening a domain error channel.
 - Bump versions through the root `package.json` catalogs, never in a single
@@ -238,8 +240,7 @@ pointed at the real cloud resources.
   value bound.
 - **Hostnames are never derived from the stage name.** The default stage is
   `dev_$USER`, and an underscore is not legal in a hostname (ADR 0024).
-- **`alchemy` is pinned to `2.0.0-beta.77`** — the first release containing PR
-  1444 (ADR 0027). The same version is what `scripts/vendor.sh` fetches. Bump
+- **`alchemy` is pinned to `2.0.0-beta.78`** (ADR 0028). The same version is what `scripts/vendor.sh` fetches. Bump
   the dependency and the vendored source together, never one alone, the way
   `effect` and `repos/effect` already move — and remember
   `@alchemy.run/better-auth` moves with `alchemy` in the same catalog.

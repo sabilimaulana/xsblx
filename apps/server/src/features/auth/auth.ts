@@ -43,7 +43,7 @@ export const makeBetterAuth = (options: BetterAuthOptions) =>
   Effect.gen(function* () {
     // Resolved in the init phase so alchemy binds it as a secret on the Worker;
     // a `Config` first read inside a handler is never discovered and never bound.
-    const secret = yield* Config.redacted("AUTH_SECRET");
+    const secret = yield* Config.Redacted("AUTH_SECRET");
     const sessionCookie = yield* SessionCookieConfig;
 
     const instance = yield* Effect.cached(

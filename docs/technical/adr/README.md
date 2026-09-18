@@ -1,7 +1,7 @@
 ---
 status: active
-version: 1.1.0
-updated: 2026-09-04
+version: 1.2.0
+updated: 2026-09-18
 ---
 
 # Architecture Decision Records
@@ -47,7 +47,8 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0024 | [Custom domains, first-party session cookie](./0024-custom-domains-make-the-session-cookie-first-party.md) | accepted                           |
 | 0025 | [Observability is Cloudflare-native](./0025-cloudflare-native-observability.md)                            | accepted, amended by 0026          |
 | 0026 | [Effect's spans go back into Cloudflare's waterfall](./0026-effect-spans-in-cloudflares-waterfall.md)      | accepted                           |
-| 0027 | [Effect, drizzle and alchemy move as one rc version set](./0027-the-rc-version-set-moves-in-lockstep.md)   | accepted                           |
+| 0027 | [Effect, drizzle and alchemy move as one rc version set](./0027-the-rc-version-set-moves-in-lockstep.md)   | superseded by 0028                 |
+| 0028 | [The version set moves to alchemy beta.78, effect rc.115 and vitest 5](./0028-the-version-set-takes-beta-78-and-vitest-5.md) | accepted |
 
 Template:
 
