@@ -90,6 +90,8 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **React and react-dom are pinned to exactly `19.3.0`.** React 19.3 throws at startup unless the two match exactly, and the caret ranges had floated them apart (`19.3.0` vs `19.2.8`), which failed the website Worker's deploy with `ScriptStartupError`. Exact pins keep them in lockstep.
+
 - **Better Auth is `1.7.5`.** 1.7.3 restored the 1.6 account schema, so the `issuer` column and its compound unique index that 1.7.0–1.7.2 added leave `apps/server/src/features/auth/schema.ts` — 1.7.5 never reads `issuer`, and the account key is `(providerId, accountId)` again. `Drizzle.Schema` diffs the removal into the next deploy's migration (drop index, drop column); email+password credential rows are unaffected. `scripts/vendor.sh` vendors `repos/better-auth` from `v1.7.5`.
 
 - **`@cloudflare/workers-types` goes `^4` → `^5.20260918.1`.** Types only, so nothing changes at runtime; the bump aligns with alchemy beta.78, whose own graph already peers v5. Tooling floats with it: `oxlint` 1.78.0 → 1.83.0, `lefthook` 2.1.10 → 2.1.14, `@types/bun` → 1.4.2.

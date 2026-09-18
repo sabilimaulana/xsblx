@@ -14,8 +14,8 @@
       "drizzle-kit": "1.0.0-rc.5-ab785fc",
       "drizzle-orm": "1.0.0-rc.5-ab785fc",
       "lucide-react": "^1.30.0",
-      "react": "^19.2.0",
-      "react-dom": "^19.2.0",
+      "react": "19.3.0",
+      "react-dom": "19.3.0",
       "tailwindcss": "^4.1.18",
       "typescript": "^7.0.2",
       "vite": "^8.0.0"
