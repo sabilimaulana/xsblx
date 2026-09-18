@@ -90,6 +90,8 @@ dev` is `alchemy dev` (Vite + HMR against the real cloud resources), and
 
 ### Changed
 
+- **Better Auth is `1.7.5`.** 1.7.3 restored the 1.6 account schema, so the `issuer` column and its compound unique index that 1.7.0–1.7.2 added leave `apps/server/src/features/auth/schema.ts` — 1.7.5 never reads `issuer`, and the account key is `(providerId, accountId)` again. `Drizzle.Schema` diffs the removal into the next deploy's migration (drop index, drop column); email+password credential rows are unaffected. `scripts/vendor.sh` vendors `repos/better-auth` from `v1.7.5`.
+
 - **`@cloudflare/workers-types` goes `^4` → `^5.20260918.1`.** Types only, so nothing changes at runtime; the bump aligns with alchemy beta.78, whose own graph already peers v5. Tooling floats with it: `oxlint` 1.78.0 → 1.83.0, `lefthook` 2.1.10 → 2.1.14, `@types/bun` → 1.4.2.
 
 - **The version set moves to alchemy `2.0.0-beta.78`, effect `4.0.0-rc.115` and vitest 5.** Beta.78 requires `effect >= 4.0.0-rc.115`, and `@effect/vitest` at rc.115 requires `vitest >= 5 < 6`, so `vitest` in `apps/server` goes `^4.1.10` → `^5.0.1` and `@effect/tsgo` goes `0.40.0` → `0.45.0`. Drizzle stays at `1.0.0-rc.5-ab785fc`, which beta.78 still pins exactly. Effect rc.113 renamed the `Config` constructors to PascalCase — `Config.redacted` → `Config.Redacted`, `Config.nonEmptyString` → `Config.NonEmptyString`, `Config.literals` → `Config.Literals` — across three call sites in `apps/server`. `scripts/vendor.sh` re-vendors `repos/effect` from `effect@4.0.0-rc.115` and `repos/alchemy` from `v2.0.0-beta.78`, and the e2e harness now deploys to a `test_$USER` stage by default. See

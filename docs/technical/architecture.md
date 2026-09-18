@@ -133,7 +133,7 @@ script.
 
 ## Auth
 
-Better Auth 1.7.2, email + password only. Runs outside the Effect runtime
+Better Auth 1.7.5, email + password only. Runs outside the Effect runtime
 and does not follow the slice (ADR 0007), and on a Worker it is a service rather
 than a module singleton (ADR 0022).
 
@@ -161,7 +161,7 @@ drizzle 1.0-rc moved that API, and relations live in `src/db/relations.ts` via
 `defineRelations`.
 
 ```
-bunx auth@1.7.2 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
+bunx auth@1.7.5 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
 # merge tables into src/features/auth/schema.ts, then:
 bun run deploy   # Drizzle.Schema generates the migration, D1 applies it
 ```

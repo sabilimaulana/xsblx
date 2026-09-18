@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * D1 is SQLite (ADR 0020): there is no `boolean` and no `timestamp` column type.
@@ -46,7 +46,6 @@ export const account = sqliteTable(
   "account",
   {
     id: text("id").primaryKey(),
-    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -62,10 +61,7 @@ export const account = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).$defaultFn(now).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).$onUpdate(now).notNull(),
   },
-  (table) => [
-    uniqueIndex("account_issuer_accountId_uidx").on(table.issuer, table.accountId),
-    index("account_userId_idx").on(table.userId),
-  ],
+  (table) => [index("account_userId_idx").on(table.userId)],
 );
 
 export const verification = sqliteTable(
