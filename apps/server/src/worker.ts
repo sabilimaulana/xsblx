@@ -4,8 +4,8 @@ import * as Cloudflare from "alchemy/Cloudflare";
 // Postgres drivers, which this project does not install.
 import { D1 as drizzleD1 } from "alchemy/Drizzle/D1";
 import { Effect, Layer, Logger, Path } from "effect";
-import { Etag, HttpPlatform, HttpRouter } from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { Etag, HttpPlatform, HttpRouter } from "effect/http";
+import { HttpApiBuilder } from "effect/http-api";
 import { Assets } from "./assets.ts";
 import { apiObservability, ApiDomainConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";

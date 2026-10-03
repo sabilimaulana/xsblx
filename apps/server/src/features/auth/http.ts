@@ -1,6 +1,6 @@
 import type * as Cloudflare from "alchemy/Cloudflare";
 import { Effect } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import type { BetterAuthService } from "./auth.ts";
 
 /**

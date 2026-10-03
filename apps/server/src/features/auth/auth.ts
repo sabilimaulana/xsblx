@@ -5,7 +5,7 @@ import type * as Cloudflare from "alchemy/Cloudflare";
 import { betterAuth } from "better-auth";
 import { drizzle } from "drizzle-orm/d1";
 import { Config, Context, Effect, Redacted } from "effect";
-import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { SessionCookieConfig } from "../../config.ts";
 import { newId } from "../../id.ts";
 import { createAvatar } from "./avatar.ts";

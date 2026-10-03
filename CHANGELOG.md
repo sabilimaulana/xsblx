@@ -9,6 +9,19 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Changed
+
+- **The version set goes stable: Effect `4.0.0` and alchemy `2.0.0-beta.80`.**
+  Beta.80 imports stable `effect/cli/*`, which no release candidate exports,
+  so the set moves off rc.115 together (ADR 0029). The `unstable/*` import
+  paths are gone repo-wide (`effect/unstable/http` → `effect/http`,
+  `effect/unstable/httpapi` → `effect/http-api`). Beta.80 declares the
+  previously-missing `mime` dependency, so the temporary direct `mime`
+  devDependency is gone and no root `overrides` are needed. `VITE_API_URL`
+  can now be overridden from the environment (read through `Config`, per the
+  Effect rules); without it the Website still builds against the API Worker's
+  URL. Drizzle stays at `1.0.0-rc.5-ab785fc`.
+
 ### Fixed
 
 - **The API Workers stopped exporting to Axiom on every request.** Both carried

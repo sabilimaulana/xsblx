@@ -1,7 +1,7 @@
 import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/auth/middleware";
 import { RuntimeContext } from "alchemy";
 import { Effect, Layer } from "effect";
-import { HttpServerRequest } from "effect/unstable/http";
+import { HttpServerRequest } from "effect/http";
 import { BetterAuth } from "./auth.ts";
 
 /**

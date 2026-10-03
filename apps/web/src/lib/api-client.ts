@@ -1,8 +1,8 @@
 import { Api } from "@xsblx/api/api";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { createEffectQueryFromManagedRuntime } from "effect-query";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
 const baseUrl = import.meta.env["VITE_API_URL"] ?? "http://localhost:3000";
 

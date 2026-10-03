@@ -5,8 +5,8 @@ import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
 import * as Test from "alchemy/Test/Bun";
 import { describe, expect } from "bun:test";
 import { Effect, Layer, Schedule } from "effect";
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { HttpApiClient } from "effect/unstable/httpapi";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 import Stack from "../../../../../alchemy.run.ts";
 
 /**
