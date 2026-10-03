@@ -1,6 +1,6 @@
 import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/auth/middleware";
 import { Effect, Layer } from "effect";
-import { HttpServerRequest } from "effect/unstable/http";
+import { HttpServerRequest } from "effect/http";
 import { auth } from "./auth.ts";
 
 /**

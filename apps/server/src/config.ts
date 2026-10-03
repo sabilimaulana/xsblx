@@ -2,7 +2,7 @@ import { availableParallelism } from "node:os";
 import { Config } from "effect";
 
 export const ServerConfig = Config.all({
-  port: Config.port("PORT").pipe(Config.withDefault(3000)),
+  port: Config.Port("PORT").pipe(Config.withDefault(3000)),
   // Workers share one port through SO_REUSEPORT. Harmless with a single process.
   reusePort: Config.succeed(true),
 });
@@ -44,7 +44,7 @@ export const workerCount = (): number => {
  * wildcard would let any site call this API from a visitor's browser.
  */
 export const CorsConfig = Config.all({
-  allowedOrigins: Config.nonEmptyString("CORS_ALLOWED_ORIGINS").pipe(
+  allowedOrigins: Config.NonEmptyString("CORS_ALLOWED_ORIGINS").pipe(
     Config.withDefault("http://localhost:3001"),
     Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
   ),
@@ -56,16 +56,16 @@ export const CorsConfig = Config.all({
  * network calls. Cloning this repo into a real project means setting it (ADR 0015).
  */
 export const ObservabilityConfig = Config.all({
-  serviceName: Config.nonEmptyString("OTEL_SERVICE_NAME").pipe(Config.withDefault("xsblx-server")),
-  otlpEndpoint: Config.nonEmptyString("OTEL_EXPORTER_OTLP_ENDPOINT").pipe(Config.option),
-  logLevel: Config.schema(Config.LogLevel, "LOG_LEVEL").pipe(Config.withDefault("Info" as const)),
+  serviceName: Config.NonEmptyString("OTEL_SERVICE_NAME").pipe(Config.withDefault("xsblx-server")),
+  otlpEndpoint: Config.NonEmptyString("OTEL_EXPORTER_OTLP_ENDPOINT").pipe(Config.option),
+  logLevel: Config.LogLevel("LOG_LEVEL").pipe(Config.withDefault("Info" as const)),
   // Structured logs are for a collector to parse; a human reading a dev terminal
   // wants the pretty renderer.
-  logFormat: Config.nonEmptyString("LOG_FORMAT").pipe(
+  logFormat: Config.NonEmptyString("LOG_FORMAT").pipe(
     Config.withDefault(process.env["NODE_ENV"] === "production" ? "json" : "pretty"),
   ),
 });
 
 export const DatabaseConfig = Config.all({
-  url: Config.redacted("DATABASE_URL"),
+  url: Config.Redacted("DATABASE_URL"),
 });

@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 # name|github repo|tag
 VENDORED=(
-  "effect|Effect-TS/effect|effect@4.0.0-beta.103"
+  "effect|Effect-TS/effect|effect@4.0.0"
   "alchemy|alchemy-run/alchemy|v2.0.0-beta.70"
   "effect-query|voidhashcom/effect-query|v1.0.4"
   "better-auth|better-auth/better-auth|v1.7.0-rc.4"

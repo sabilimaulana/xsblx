@@ -1,6 +1,6 @@
 import { PgClient } from "@effect/sql-pg";
 import { migrate } from "drizzle-orm/effect-postgres/migrator";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Data, Effect, Layer, ManagedRuntime } from "effect";
 import { fileURLToPath } from "node:url";
 import { Drizzle, PgLive } from "./db/index.ts";
 
@@ -18,8 +18,21 @@ const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
  * Runs the same migrations as production, so schema drift fails the test run
  * instead of surfacing as a confusing query error (ADR 0004).
  */
+class MigrateError extends Data.Error<{
+  readonly cause: unknown;
+}> {
+  readonly _tag = "MigrateError";
+}
+
 export const migrateTestDb = () =>
-  runtime.runPromise(Drizzle.use((db) => migrate(db, { migrationsFolder })).pipe(Effect.orDie));
+  runtime.runPromise(
+    Drizzle.use((db) =>
+      Effect.mapError(
+        migrate(db, { migrationsFolder }),
+        (cause: unknown) => new MigrateError({ cause }),
+      ),
+    ).pipe(Effect.orDie),
+  );
 
 /**
  * Truncating before each test is what keeps assertions like "this user sees no

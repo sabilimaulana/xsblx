@@ -48,10 +48,9 @@ another library for anything Effect already provides.
 
 - **Read `repos/effect/LLMS.md` before writing any Effect code.** `repos/effect/`
   is the API source of truth, vendored at the exact runtime version.
-- **Effect is pinned to `4.0.0-beta.103`. Never bump it or its companions
-  individually** (ADR 0002). Consequences that bite daily: errors are
-  `Schema.TaggedErrorClass<Self>()(tag, fields, annotations)`, **not**
-  `Schema.TaggedError`; drizzle queries are Effects failing with `SqlError`, so
+- **Effect is pinned to `4.0.0`. Never bump it or its companions
+  individually** (ADR 0019). Consequences that bite daily: errors are
+  `Schema.TaggedError<Self>()(tag, fields, annotations)`; drizzle queries are Effects failing with `SqlError`, so
   `Effect.orDie` them in services rather than widening a domain error channel.
 - Bump versions through the root `package.json` catalogs, never in a single
   workspace.

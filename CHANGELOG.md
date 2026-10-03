@@ -9,6 +9,17 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Changed
+
+- **The version set goes stable: Effect `4.0.0`, better-auth `1.7.5`,
+  vitest 5.** Same versions as the `cloudflare` branch so both share one
+  Effect generation (ADR 0019). The `unstable/*` import paths are gone
+  repo-wide, `Schema.TaggedErrorClass` is `Schema.TaggedError`, and the
+  lowercase `Config` constructors take PascalCase. `tsconfig.effect.json`
+  aliases `effect/unstable/sql/*` back onto `effect/sql/*` because
+  drizzle-orm rc.5's types still import the removed path. Drizzle stays at
+  `1.0.0-rc.5-ab785fc`.
+
 ### Added
 
 - **Every account gets a randomly generated avatar at registration** — a

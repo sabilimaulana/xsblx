@@ -197,6 +197,9 @@
           }
         ]
       }
-    ]
+    ],
+    "paths": {
+      "effect/unstable/sql/*": ["./node_modules/.bun/effect@4.0.0/node_modules/effect/dist/sql/*"]
+    }
   }
 }

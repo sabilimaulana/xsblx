@@ -1,5 +1,5 @@
 import { migrate } from "drizzle-orm/effect-postgres/migrator";
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { BunRuntime } from "@effect/platform-bun";
 import { fileURLToPath } from "node:url";
 import { Drizzle, DrizzleLive } from "./db/index.ts";
@@ -11,8 +11,15 @@ import { Drizzle, DrizzleLive } from "./db/index.ts";
  */
 const migrationsFolder = fileURLToPath(new URL("../drizzle", import.meta.url));
 
-Drizzle.use((db) => migrate(db, { migrationsFolder })).pipe(
-  Effect.provide(DrizzleLive),
-  Effect.orDie,
-  BunRuntime.runMain,
-);
+class MigrateError extends Data.Error<{
+  readonly cause: unknown;
+}> {
+  readonly _tag = "MigrateError";
+}
+
+Drizzle.use((db) =>
+  Effect.mapError(
+    migrate(db, { migrationsFolder }),
+    (cause: unknown) => new MigrateError({ cause }),
+  ),
+).pipe(Effect.provide(DrizzleLive), Effect.orDie, BunRuntime.runMain);

@@ -1,4 +1,4 @@
-import { HttpApi, OpenApi } from "effect/unstable/httpapi";
+import { HttpApi, OpenApi } from "effect/http-api";
 import { HealthApiGroup } from "./features/health/group.ts";
 import { TodosApiGroup } from "./features/todos/group.ts";
 
