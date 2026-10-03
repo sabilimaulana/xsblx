@@ -4,9 +4,9 @@ pre-commit:
     - name: format
       glob: "*.{js,jsx,ts,tsx,json,css}"
       exclude: "repos/**"
-      run: bunx oxfmt --disable-nested-config {staged_files}
+      run: export PATH="$HOME/.bun/bin:$PATH" && bun x oxfmt --disable-nested-config {staged_files}
       stage_fixed: true
     - name: lint
       glob: "*.{js,jsx,ts,tsx}"
       exclude: "repos/**"
-      run: bunx oxlint --disable-nested-config {staged_files}
+      run: export PATH="$HOME/.bun/bin:$PATH" && bun x oxlint --disable-nested-config {staged_files}
