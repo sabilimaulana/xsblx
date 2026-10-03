@@ -15,5 +15,8 @@ import { defineConfig } from "vite";
  */
 export default defineConfig({
   resolve: { tsconfigPaths: true },
+  // Dev-only: allow the public tunnel hostname (cloudflared preserves
+  // the public Host, which Vite blocks by default). No effect on builds.
+  server: { allowedHosts: ["xsblx-hermes.sblsblsbl.club"] },
   plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
 });

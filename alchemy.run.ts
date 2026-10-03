@@ -1,7 +1,7 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
 import { providers as drizzleProviders } from "alchemy/Drizzle/Providers";
-import { Effect, Layer } from "effect";
+import { Config, Effect, Layer, Option } from "effect";
 import { fileURLToPath } from "node:url";
 import { WebDomainConfig, websiteObservability } from "./apps/server/src/config.ts";
 import { Database } from "./apps/server/src/db/database.ts";
@@ -36,6 +36,12 @@ export default Alchemy.Stack(
     const database = yield* Database;
     const api = yield* ApiWorker;
 
+    // An explicit VITE_API_URL in the environment overrides the stage URL
+    // (dev via public tunnel hostname); otherwise the Website builds against
+    // the API Worker's own URL. Read through Config: raw process.env reads
+    // are rejected in Effect code (tsconfig.effect.json).
+    const viteApiUrlOverride = yield* Config.option(Config.String("VITE_API_URL"));
+
     const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: fileURLToPath(new URL("./apps/web", import.meta.url)),
       // The hostname this stage serves on, or nothing — in which case alchemy
@@ -52,7 +58,7 @@ export default Alchemy.Stack(
       observability: websiteObservability,
       // `VITE_`-prefixed, so the API origin is inlined into the client bundle at
       // build time — the browser talks to the API Worker directly.
-      env: { VITE_API_URL: api.url.as<string>() },
+      env: { VITE_API_URL: Option.getOrElse(viteApiUrlOverride, () => api.url.as<string>()) },
       // No `assets.runWorkerFirst`: with it, the SSR Worker answers *every*
       // request including `/assets/*`, has no route for them, and 404s the whole
       // client bundle while the document still renders. Assets-first only
