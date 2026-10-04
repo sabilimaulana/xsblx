@@ -1,22 +1,6 @@
 import type * as Cloudflare from "alchemy/Cloudflare";
 import { Effect } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
-import type { BetterAuthService } from "./auth.ts";
-
-/**
- * Better Auth ships its own web-standard `Request -> Response` handler, so it is
- * mounted as a raw route rather than described in `packages/api`: its routes are
- * the library's contract, not ours (ADR 0007).
- *
- * The service is passed in rather than taken from context: a raw route's
- * requirements do not flow into the layer that declares it — `HttpRouter.add`
- * marks them as the *handler's*, so `Layer.provide` cannot satisfy them and they
- * would surface on the Worker's `fetch` type instead. What does stay on the
- * handler is alchemy's `RuntimeContext`, which the Worker bridge provides per
- * event; that one is per-request by nature and cannot be provided any earlier.
- */
-export const authRoutes = (betterAuth: BetterAuthService) =>
-  HttpRouter.add("*", "/api/auth/*", betterAuth.fetch);
 
 /**
  * `public/*` is the read path for generated assets (ADR 0021). R2 only serves

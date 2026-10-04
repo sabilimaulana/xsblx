@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@yielded/auth": "^0.1.0-beta.14",
     "effect": "catalog:effect"
   },
   "devDependencies": {

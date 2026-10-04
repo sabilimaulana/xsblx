@@ -4,4 +4,5 @@
  * `features/<name>/schema.ts` and are re-exported here.
  */
 export * from "../features/auth/schema.ts";
+export * from "../features/auth/yielded-tables.ts";
 export * from "../features/todos/schema.ts";

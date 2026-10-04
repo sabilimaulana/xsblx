@@ -3,7 +3,7 @@ import * as Cloudflare from "alchemy/Cloudflare";
 // Subpath import: the `alchemy/Drizzle` barrel eagerly loads its MySQL and
 // Postgres drivers, which this project does not install.
 import { D1 as drizzleD1 } from "alchemy/Drizzle/D1";
-import { Effect, Layer, Logger, Path } from "effect";
+import { Effect, Config, Layer, Logger, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Assets } from "./assets.ts";
@@ -11,9 +11,11 @@ import { apiObservability, ApiDomainConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
-import { BetterAuth, makeBetterAuth } from "./features/auth/auth.ts";
-import { assetRoutes, authRoutes } from "./features/auth/http.ts";
+import { assetRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
+import { makeYieldedHttp } from "./features/auth/yielded-http.ts";
+import { AuthLive } from "./features/auth/yielded-live.ts";
+import { signOutRoutes } from "./features/auth/yielded-signout.ts";
 import { HealthHandlers } from "./features/health/http.ts";
 import { TodosApiHandlers } from "./features/todos/http.ts";
 
@@ -89,31 +91,55 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const d1 = yield* Cloudflare.D1.QueryDatabase(database);
     const db = yield* drizzleD1(d1, { relations });
     const assets = yield* Cloudflare.R2.ReadWriteBucket(Assets);
-    const baseUrl = yield* Cloudflare.Worker.URL;
+    // The API's public origin is explicit stage configuration, not something
+    // init can derive: the `Worker.URL` accessor and the raw D1 binding only
+    // resolve per request behind alchemy's bridge `RuntimeContext`, which init
+    // never has (it runs at plan time and per isolate start). The old Better
+    // Auth setup deferred those reads per request behind `Effect.cached`;
+    // yielded needs the origin string at build, so the stage declares it.
+    // Reading it here also binds it as Worker env (like `AUTH_SECRET`).
+    const origin = yield* Config.String("API_PUBLIC_ORIGIN");
 
-    const betterAuth = yield* makeBetterAuth({
-      database: d1,
-      assets,
-      baseUrl,
-      trustedOrigins: cors.allowedOrigins,
-    });
+    // Yielded owns the whole auth surface. `routes()` is its operation API
+    // (register/sign-in/session) with its request handling baked in — the
+    // managed-sqlite example mounts it standalone, no extra wrapping.
+    // The app Api keeps its own `Authentication` middleware, but that
+    // middleware resolves sessions through yielded's validated request, so
+    // the Api routes get `yielded.middleware` applied: it parses cookies and
+    // provides `AuthRequest` per request (kind "request" performs no origin
+    // or CSRF rejection — it only makes the credentials available), which
+    // `Authentication` declares in `requires`.
+    const yielded = makeYieldedHttp(origin);
+    const apiRoutes = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
+      Layer.provide([HealthHandlers, TodosApiHandlers.pipe(Layer.provide(AuthenticationLive))]),
+      // The request middleware validates its static configuration (origin
+      // shape, cookie names) at build; a failure is wiring in this file, so
+      // it dies rather than widening the Worker's error channel. Per-request
+      // failures stay typed inside the middleware.
+      (routes) => Layer.orDie(yielded.middleware(routes)),
+    );
+    // `routes()` builds yielded's operation API; a build failure here (cookie
+    // mismatch, contract drift) is a wiring defect in this file, not an
+    // operator error, so it dies instead of widening the Worker's channel.
+    const yieldedHttp = Layer.orDie(yielded.routes());
+    // Native sign-out runs under the same request middleware: `signOut`
+    // reads the validated request credential, so it needs `AuthRequest`
+    // exactly like the contract actions do.
+    const signOutHttp = Layer.orDie(yielded.middleware(signOutRoutes));
 
     return {
       fetch: yield* HttpRouter.toHttpEffect(
-        Layer.mergeAll(
-          HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-            Layer.provide([
-              HealthHandlers,
-              TodosApiHandlers.pipe(Layer.provide(AuthenticationLive)),
-            ]),
-          ),
-          authRoutes(betterAuth),
-          assetRoutes(assets),
-        ).pipe(
-          // The session middleware takes the `BetterAuth` tag rather than the
-          // instance, so it stays substitutable; this is where the instance is
-          // handed over.
-          Layer.provide([Db.layer(db), Layer.succeed(BetterAuth)(betterAuth)]),
+        Layer.mergeAll(apiRoutes, yieldedHttp, signOutHttp, assetRoutes(assets)).pipe(
+          // The session middleware takes the yielded `AppAuth` tag rather
+          // than an instance, so it stays substitutable. Each `provide`
+          // feeds one layer's outputs downward while that layer's own
+          // requirements stay open for the next — a single
+          // `provide([AuthLive, Db.layer(db), ...])` would NOT let the
+          // sibling layers satisfy `AuthLive`'s `Db`/`SqlClient` needs.
+          // The full yielded stack (auth service, D1 persistence, keys) is
+          // handed over here.
+          Layer.provide(AuthLive),
+          Layer.provide(Db.layer(db)),
           // `consoleStructured`, not `consoleJson`: it hands `console.log` the
           // record as an *object*, and Workers Logs indexes a logged object's
           // fields into queryable columns. A JSON string would arrive as one

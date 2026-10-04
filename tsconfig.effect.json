@@ -191,6 +191,20 @@
                 "newPromise": "off"
               }
             }
+          },
+          {
+            // Yielded persistence ports must be R = never (the kernels call
+            // them in their own context), so Effect's Clock (R = Clock) is
+            // unusable inside port methods — Date.now is the only clock.
+            "include": [
+              "**/features/auth/yielded-*-ports.ts",
+              "**/features/auth/yielded-support.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "globalDate": "off"
+              }
+            }
           }
         ]
       }

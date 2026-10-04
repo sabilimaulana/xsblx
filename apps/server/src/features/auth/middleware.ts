@@ -1,58 +1,69 @@
 import { Authentication, CurrentUser, Unauthorized } from "@xsblx/api/auth/middleware";
-import { RuntimeContext } from "alchemy";
-import { Effect, Layer } from "effect";
-import { HttpServerRequest } from "effect/http";
-import { BetterAuth } from "./auth.ts";
+import { Auth } from "@yielded/auth";
+import { Effect, Layer, Schema } from "effect";
+import { HttpRouter, HttpServerRequest } from "effect/http";
+
+import { AppAuth } from "./yielded-auth.ts";
 
 /**
- * Resolves the session cookie into `CurrentUser`. Better Auth runs outside the
- * Effect runtime, so its promise is wrapped here; a missing or expired session is
- * a 401, not a defect.
+ * Spike: session middleware on yielded-auth.
  *
- * `RuntimeContext.phantom` is an empty layer that only erases a type: the D1
- * binding behind Better Auth resolves lazily and therefore carries alchemy's
- * `RuntimeContext` in its requirements, and `HttpApiMiddleware` admits nothing
- * beyond what it provides. Erasing it here is what keeps that requirement — and
- * alchemy itself — out of `packages/api`'s middleware contract. Nothing is
- * shadowed, because the layer provides nothing: when the handler actually runs,
- * the Worker bridge's own runtime context is still the one in scope.
+ * Resolves the session cookie into `CurrentUser` through the yielded session
+ * API. Anonymous, expired, or revoked sessions are a 401 (`Unauthorized`),
+ * not a defect — every pre-sign-in page load produces one.
+ *
+ * `AuthRequest` (the validated request the session API needs) must already be
+ * in context: the yielded HTTP middleware provides it, so this layer is
+ * always composed under yielded's `middleware`, never standalone.
  */
 export const AuthenticationLive = Layer.effect(
   Authentication,
   Effect.gen(function* () {
-    const betterAuth = yield* BetterAuth;
+    const auth = yield* AppAuth;
 
     return (httpEffect) =>
       Effect.provideServiceEffect(
         httpEffect,
         CurrentUser,
+        // `requireSession` needs the plain `AuthRequest` service, but a
+        // middleware implementation may only carry the request marker — the
+        // router satisfies the marker per request from the yielded HTTP
+        // middleware's provision. The cast states exactly that: same value,
+        // same failures, marker in place of the service. (Yielded's own
+        // session security does the identical cast.)
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest;
-          const auth = yield* betterAuth.auth;
-          const session = yield* Effect.promise(() =>
-            auth.api.getSession({ headers: (request.source as Request).headers }),
+          yield* Effect.annotateCurrentSpan(
+            "authPath",
+            new URL(request.url, "http://auth.invalid").pathname,
           );
-          if (session === null) {
-            // Every pre-sign-in page load produces one of these, and the tracer
-            // marks the span `effect.exit: "failure"` regardless. Without this
-            // attribute an ordinary anonymous request is indistinguishable from
-            // auth actually being broken.
-            yield* Effect.annotateCurrentSpan("outcome", "no-session");
-            return yield* Unauthorized.make();
-          }
+          const session = yield* auth.requireSession().pipe(
+            Effect.catchTags({
+              SessionInvalid: () => Unauthorized.make(),
+              AuthenticationRequired: () => Unauthorized.make(),
+            }),
+            // Infrastructure failures (D1 down, keys missing) are defects, not
+            // 401s — but the `Unauthorized` values above must pass through.
+            Effect.catch((rest) =>
+              Schema.is(Unauthorized)(rest) ? Effect.fail(rest) : Effect.die(rest),
+            ),
+          );
           // The owner id is the one attribute worth carrying into the trace: it
           // is an opaque nanoid, so it identifies a request's subject without
           // putting an email address in Cloudflare's span attributes. The email
           // deliberately stays out.
-          yield* Effect.annotateCurrentSpan("userId", session.user.id);
-          return { id: session.user.id, email: session.user.email };
+          yield* Effect.annotateCurrentSpan("userId", session.subjectId);
+          return { id: session.subjectId, email: session.claims.email };
         }).pipe(
-          Effect.provide(RuntimeContext.phantom),
-          // Better Auth's session cookie cache means this either verifies a
-          // signature or hits D1, and the two differ by an order of magnitude.
-          // Without a span of its own that cost is folded into the handler's.
+          // The yielded session read verifies a signature and may hit D1, and
+          // the two differ by an order of magnitude. Without a span of its own
+          // that cost is folded into the handler's.
           Effect.withSpan("Auth.session"),
-        ),
+        ) as unknown as Effect.Effect<
+          { readonly id: string; readonly email: string },
+          Unauthorized,
+          HttpRouter.Request.From<"Requires", Auth.AuthRequest>
+        >,
       );
   }),
 );
