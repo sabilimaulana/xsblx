@@ -1,5 +1,17 @@
 # yielded-auth spike: bundle / performance / flexibility numbers
 
+> **2026-10-04 ~12:45 WIB postscript — the caveat below is resolved.** The
+> `PasswordUnavailable` on all password flows was a stale dev Worker (old
+> bundle serving new-table traffic), not a code regression: after a clean
+> `bun run dev` restart the migration applied and every flow verified green
+> on the native code — fresh register → `RegistrationAccepted`, sign-in →
+> session cookie, `GET /todos` → 200 + create/list, duplicate register →
+> suppressed-accepted, wrong password → `PasswordRejected`, plus new native
+> `POST /api/auth/sign-out` → `revoked` + cleared cookie + old bearer 401.
+> Latency numbers below stay as measured (error-path); success-path register
+> 0.107–0.126 s (n=3) was observed on a good boot. Positive-path precise
+> timing + per-flow D1 deltas still unmeasured — next step when needed.
+
 Branch `yielded-auth`, measured 2026-10-04 ~12:30 WIB against dev Worker on `localhost:1337`.
 ⚠️ **Caveat first:** the currently-deployed worker (rebuilt 12:27, uncommitted spike in progress)
 returns `PasswordUnavailable` on **all** password flows. Latencies below are real timings, but
