@@ -1,7 +1,7 @@
 import { MIN_PASSWORD_LENGTH } from "@xsblx/api/auth/credentials";
 import { Password } from "@yielded/auth";
 import * as Portable from "@yielded/crypto/Portable";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schedule } from "effect";
 
 /**
  * Password hashing (Argon2id from `@yielded/crypto/Portable` — Workers
@@ -23,18 +23,41 @@ export const ScreeningLive = Layer.succeed(
 );
 
 /**
- * One `PasswordKdfAdmission` instance feeds both the hasher and the KDF
- * backend, so a single permit bounds every derivation in the isolate. Effect
- * `Crypto` comes from the auth assembly (`yielded-live.ts`).
+ * Argon2id derivations, at most one at a time per isolate.
  *
- * A derivation holds the permit ~2.5s, so the queue is sized to what one
- * permit drains inside the wait: 8 queued × 2.5s ≈ 20s. The default (16
- * queued, 5s) turned the third concurrent sign-in into `PasswordUnavailable`
- * while it still had a turn coming. Waiting costs wall time, not CPU time.
+ * yielded's admission is an isolate-wide semaphore, and on workerd a request
+ * must never wait on it: the permit is released from the *holder's* request,
+ * so the waiter resumes inside another request's I/O context. That surfaced
+ * as `Maximum call stack size exceeded` and "code had hung" cancellations under
+ * concurrent sign-ins. So the queue is 0 — a busy isolate answers
+ * `PasswordKdfBusy` at once — and the retry below waits on its own timer, in
+ * its own request.
+ *
+ * ponytail: polling, not a FIFO queue. A request gives up after ~20s
+ * (80 × 250ms); a derivation holds the permit ~2.5s, so ~8 can be behind one.
+ * Effect `Crypto` comes from the auth assembly (`yielded-live.ts`).
  */
-export const HashingLive = Password.PasswordHashing.layer().pipe(
+const retryWhileBusy = <A, E extends { readonly _tag: string }>(effect: Effect.Effect<A, E>) =>
+  Effect.retry(effect, {
+    while: (error) => error._tag === "PasswordKdfBusy",
+    schedule: Schedule.spaced("250 millis"),
+    times: 80,
+  });
+
+export const HashingLive = Layer.effect(
+  Password.PasswordHashing,
+  Effect.gen(function* () {
+    const hashing = yield* Password.PasswordHashing;
+    return Password.PasswordHashing.of({
+      hash: (password) => retryWhileBusy(hashing.hash(password)),
+      verify: (password, verifier) => retryWhileBusy(hashing.verify(password, verifier)),
+      dummy: (password) => retryWhileBusy(hashing.dummy(password)),
+    });
+  }),
+).pipe(
+  Layer.provide(Password.PasswordHashing.layer()),
   Layer.provide(Portable.layer(globalThis.crypto.subtle)),
-  Layer.provide(Password.PasswordKdfAdmission.layer({ maxQueued: 8, maxWaitMilliseconds: 20_000 })),
+  Layer.provide(Password.PasswordKdfAdmission.layer({ maxQueued: 0 })),
 );
 
 export const PasswordPolicyLive = Password.NewPasswordCheck.layer({

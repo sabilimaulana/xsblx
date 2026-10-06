@@ -30,9 +30,12 @@ in an ADR, not here — link it.
   HTTPS. A bad value is a `ConfigError` at deploy; before, a trailing slash
   crashed the Worker at startup.
 
-- **Concurrent password sign-ins queue instead of failing.** Argon2 admission
-  queues up to 8 derivations for up to 20s per isolate; before, the third
-  concurrent sign-in failed after 5s.
+- **Concurrent password sign-ins no longer crash or hang.** Waiting on
+  yielded's isolate-wide Argon2 semaphore resumed a request inside another
+  request's context on workerd, which failed it with `Maximum call stack size
+  exceeded` or a "code had hung" cancellation. A busy isolate now answers
+  `PasswordKdfBusy` at once, and the request retries on its own timer for up to
+  ~20s.
 
 - **One client can no longer lock every user out of sign-in.** The D1 attempt
   limiter no longer charges yielded's deployment-wide `sign-in` bucket; the

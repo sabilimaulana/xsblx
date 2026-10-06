@@ -273,6 +273,12 @@ pointed at the real cloud resources.
 - **`Config` is resolved in the init phase or it is not bound.** That is what
   turns `AUTH_PROOF_KEY` into a secret on the deployed Worker; a `Config` first read
   inside a handler is missing at runtime.
+- **A request never waits on something another request releases.** An
+  isolate-wide Effect `Semaphore`, `Deferred`, `Queue` or `PubSub` that one
+  request blocks on and another completes resumes the waiter inside the
+  completer's I/O context: workerd fails it as `Maximum call stack size
+  exceeded` or cancels it as hung. Fail fast and retry on the request's own
+  timer instead, as `HashingLive` in `features/auth/yielded-hashing.ts` does.
 - **`HttpPlatform.layer` cannot be provided** — an isolate has no filesystem.
   `worker.ts` provides the stub; do not reach for file responses.
 
