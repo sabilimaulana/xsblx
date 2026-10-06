@@ -1,0 +1,1 @@
+CREATE INDEX `xsblx_auth_sessions_idx_0` ON `xsblx_auth_sessions` (`subject_id`,`session_id`);

@@ -4,18 +4,50 @@ import { Card, CardContent, CardHeader, CardTitle } from "@xsblx/ui/components/c
 import { Field, FieldError, FieldLabel } from "@xsblx/ui/components/field";
 import { Input } from "@xsblx/ui/components/input";
 import { useForm } from "@tanstack/react-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { Effect } from "effect";
 import { useState } from "react";
-import { signIn, signUp } from "@/lib/auth-client";
+import { auth, eq, randomId } from "@/lib/api-client";
+import { sessionKey } from "@/lib/session";
+
+type Credentials = { readonly name: string; readonly email: string; readonly password: string };
 
 /**
- * Sign-in and sign-up differ only by the `name` field and which Better Auth call
- * they make, so they share one component rather than two near-identical routes.
+ * Sign-in and sign-up differ only by the `name` field and whether a
+ * registration runs first, so they share one component rather than two
+ * near-identical routes. Registration never signs in by itself — it answers
+ * the same way for a new and an existing address — so sign-up signs in after.
  */
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const isSignUp = mode === "sign-up";
+
+  const account = useMutation(
+    eq.mutationOptions({
+      mutationKey: ["auth", mode],
+      mutationFn: ({ name, email, password }: Credentials) =>
+        Effect.gen(function* () {
+          if (isSignUp) {
+            // Idempotency key for this submission: a retry of the same
+            // request is suppressed server-side rather than repeated.
+            const requestId = yield* randomId;
+            yield* auth((client) =>
+              client.register({
+                requestId,
+                email,
+                newPassword: password,
+                registration: { displayName: name, email },
+              }),
+            );
+          }
+          return yield* auth((client) => client.passwordSignIn({ email, password }));
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKey }),
+    }),
+  );
 
   const form = useForm({
     defaultValues: { name: "", email: "", password: "" },
@@ -23,12 +55,18 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     validators: { onSubmit: isSignUp ? SignUpStandard : SignInStandard },
     onSubmit: async ({ value }) => {
       setError(null);
-      const result = isSignUp
-        ? await signUp.email({ name: value.name, email: value.email, password: value.password })
-        : await signIn.email({ email: value.email, password: value.password });
-
-      if (result.error) {
-        setError(result.error.message ?? "Something went wrong");
+      try {
+        await account.mutateAsync(value);
+      } catch (failure) {
+        setError(
+          failure instanceof Error && "match" in failure
+            ? (failure as { match: (m: object) => string }).match({
+                PasswordRejected: () => "Email or password is incorrect",
+                NewPasswordRejected: () => "Choose a different password",
+                OrElse: () => "Something went wrong",
+              })
+            : "Something went wrong",
+        );
         return;
       }
       await navigate({ to: "/todos" });

@@ -27,7 +27,7 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0004 | [Tests hit real Postgres](./0004-tests-hit-real-postgres.md)                                               | superseded by 0020                 |
 | 0005 | [Feature-first slices](./0005-feature-first-slices.md)                                                     | accepted                           |
 | 0006 | [Exactly one workspace depends on `vite`](./0006-exactly-one-vite-dependent.md)                            | accepted                           |
-| 0007 | [Better Auth runs outside Effect](./0007-better-auth-outside-effect.md)                                    | accepted, amended by 0022          |
+| 0007 | [Better Auth runs outside Effect](./0007-better-auth-outside-effect.md)                                    | superseded by 0030                 |
 | 0008 | [Two origins, CORS with credentials](./0008-two-origins-cors-with-credentials.md)                          | accepted, amended by 0022          |
 | 0009 | [Effect Schema is the only validator](./0009-effect-schema-is-the-only-validator.md)                       | accepted                           |
 | 0010 | [TanStack Query owns server reads](./0010-tanstack-query-owns-server-reads.md)                             | accepted                           |
@@ -42,14 +42,15 @@ rule you obey on every edit? → `AGENTS.md`.
 | 0019 | [Cloudflare is the deploy target, via alchemy](./0019-cloudflare-deploy-through-alchemy.md)                | accepted, amended by 0023          |
 | 0020 | [D1 is the database](./0020-d1-is-the-database.md)                                                         | accepted                           |
 | 0021 | [R2 holds generated assets](./0021-r2-holds-generated-assets.md)                                           | accepted                           |
-| 0022 | [Better Auth becomes a service on D1](./0022-better-auth-as-a-service-on-d1.md)                            | accepted, amended by 0024          |
+| 0022 | [Better Auth becomes a service on D1](./0022-better-auth-as-a-service-on-d1.md)                            | superseded by 0030                 |
 | 0023 | [Axiom is the telemetry sink](./0023-axiom-is-the-telemetry-sink.md)                                       | superseded by 0025                 |
-| 0024 | [Custom domains, first-party session cookie](./0024-custom-domains-make-the-session-cookie-first-party.md) | accepted                           |
+| 0024 | [Custom domains, first-party session cookie](./0024-custom-domains-make-the-session-cookie-first-party.md) | accepted, amended by 0030          |
 | 0025 | [Observability is Cloudflare-native](./0025-cloudflare-native-observability.md)                            | accepted, amended by 0026          |
 | 0026 | [Effect's spans go back into Cloudflare's waterfall](./0026-effect-spans-in-cloudflares-waterfall.md)      | accepted                           |
 | 0027 | [Effect, drizzle and alchemy move as one rc version set](./0027-the-rc-version-set-moves-in-lockstep.md)   | superseded by 0028                 |
 | 0028 | [The version set moves to alchemy beta.78, effect rc.115 and vitest 5](./0028-the-version-set-takes-beta-78-and-vitest-5.md) | superseded by 0029 |
 | 0029 | [The version set goes stable: effect 4.0.0 and alchemy beta.80](./0029-the-version-set-goes-stable.md) | accepted |
+| 0030 | [yielded-auth replaces Better Auth](./0030-yielded-auth-replaces-better-auth.md) | accepted |
 
 Template:
 

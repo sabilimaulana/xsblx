@@ -9,8 +9,82 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Removed
+
+- **The D1 proof ports.** Nothing could reach them — no reset endpoint, no
+  verified identifier — and they did not hold the contract's single-use
+  guarantees. Proof persistence is now a fail-closed stub, and the password
+  ports reject every reset. Real ports return with the reset feature.
+
+### Added
+
+- **An hourly cron on the API Worker deletes expired auth rows**: sessions,
+  session flows, password attempts and commands, and limiter charges older
+  than a day. Before, these tables grew by a row per sign-in, forever.
+
+### Fixed
+
+- **A malformed origin fails the deploy, not every request.**
+  `CORS_ALLOWED_ORIGINS` entries and `API_PUBLIC_ORIGIN` must be exact origins
+  (no path, no trailing slash, no wildcard), and `API_PUBLIC_ORIGIN` must be
+  HTTPS. A bad value is a `ConfigError` at deploy; before, a trailing slash
+  crashed the Worker at startup.
+
+- **Concurrent password sign-ins no longer crash or hang.** Waiting on
+  yielded's isolate-wide Argon2 semaphore resumed a request inside another
+  request's context on workerd, which failed it with `Maximum call stack size
+  exceeded` or a "code had hung" cancellation. A busy isolate now answers
+  `PasswordKdfBusy` at once, and the request retries on its own timer for up to
+  ~20s.
+
+- **One client can no longer lock every user out of sign-in.** The D1 attempt
+  limiter no longer charges yielded's deployment-wide `sign-in` bucket; the
+  per-email and per-subject budgets still apply.
+
+- **Listing a user's sessions is keyset-paginated and indexed.** The query
+  pages over a new `(subject_id, session_id)` index on `xsblx_auth_sessions`,
+  filters expired rows in SQL, and reads the subject once per page instead of
+  twice per session.
+
+- **`@yielded/*` versions live once, in the root `catalog:yielded`.** Each
+  workspace references the catalog, so a bump cannot leave two copies of
+  `@yielded/auth` installed. The server lists `@yielded/auth` and
+  `@yielded/crypto` as runtime dependencies.
+
+- **The `user` rebuild migration no longer empties `todos`.**
+  `20261004053311_cute_lady_bullseye` drops and recreates `user`, which on D1
+  cascaded into every todo; it now copies `todos` aside and restores them.
+- **yielded-auth D1 ports commit atomically where the contract requires it.**
+  The password attempt limiter charges in one conditional insert, so
+  concurrent attempts cannot exceed the budget. Registration and session
+  establishment each write in one D1 batch. Session rotation is a
+  compare-and-swap on digest and version. Registration writes the `user` row
+  itself; the unused provisioning layer is removed.
+
 ### Changed
 
+- **yielded-auth replaces Better Auth, end to end** (ADR 0030, superseding ADR
+  0007 and ADR 0022). The web signs in, signs up and signs out through
+  yielded's client, built from the shared contract in `packages/api` and run on
+  the same runtime as the `Api` client; the session is a TanStack query.
+  Sign-up registers, then signs in. The custom `POST /api/auth/sign-out` route
+  is gone in favour of the contract's `signOut`. The auth routes now admit the
+  HTTPS origins in `CORS_ALLOWED_ORIGINS`, and CORS allows the
+  `x-effect-auth-csrf` header. `better-auth`, `@better-auth/drizzle-adapter`,
+  `@alchemy.run/better-auth`, `blobatar`, avatars, `AUTH_SECRET`,
+  `SESSION_COOKIE_SAMESITE` and the vendored `repos/better-auth` are removed.
+  The session cookie is always `SameSite=Lax`, so a stage whose website signs
+  users in needs `WEB_DOMAIN`/`API_DOMAIN` under one registrable domain.
+
+- **yielded-auth spike moves to `0.1.0-beta.23`, the zero-dependency core.**
+  `@yielded/auth-crypto` is replaced by `@yielded/crypto`: password Argon2id
+  runs on its `Portable` backend, and Effect `Crypto`/`Hmac` come from its
+  WebCrypto layer. Attempt limiting left persistence for the
+  `PasswordAttemptLimiter` service, so the managed `password_scopes` and
+  `password_charges` tables are gone and a D1-backed limiter over a new
+  `xsblx_auth_password_attempt_charges` table replaces the per-isolate default.
+  The unused `@yielded/auth-persistence-drizzle` dependency is dropped and the
+  yielded versions are pinned exactly.
 - **The version set goes stable: Effect `4.0.0` and alchemy `2.0.0-beta.80`.**
   Beta.80 imports stable `effect/cli/*`, which no release candidate exports,
   so the set moves off rc.115 together (ADR 0029). The `unstable/*` import

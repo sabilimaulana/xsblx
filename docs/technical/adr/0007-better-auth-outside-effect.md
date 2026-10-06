@@ -1,8 +1,9 @@
 ---
-status: accepted
+status: superseded
 version: 1.0.0
 updated: 2026-08-10
 amended-by: ./0022-better-auth-as-a-service-on-d1.md
+superseded-by: ./0030-yielded-auth-replaces-better-auth.md
 ---
 
 # 0007 — Better Auth runs outside Effect, and owns its own HTTP contract

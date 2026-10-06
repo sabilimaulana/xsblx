@@ -7,13 +7,15 @@ import { Effect, Layer, Logger, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Assets } from "./assets.ts";
-import { apiObservability, ApiDomainConfig, CorsConfig } from "./config.ts";
+import { apiObservability, ApiDomainConfig, ApiPublicOriginConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
-import { BetterAuth, makeBetterAuth } from "./features/auth/auth.ts";
-import { assetRoutes, authRoutes } from "./features/auth/http.ts";
+import { assetRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
+import { cleanupExpired } from "./features/auth/yielded-cleanup.ts";
+import { makeYieldedHttp } from "./features/auth/yielded-http.ts";
+import { AuthLive } from "./features/auth/yielded-live.ts";
 import { HealthHandlers } from "./features/health/http.ts";
 import { TodosApiHandlers } from "./features/todos/http.ts";
 
@@ -43,7 +45,7 @@ const HttpPlatformStub = Layer.succeed(HttpPlatform.HttpPlatform)({
  * router into the `fetch` handler Cloudflare invokes.
  *
  * Public on purpose (ADR 0008): the browser calls this Worker directly with the
- * Better Auth session cookie, which is what makes the CORS allow-list and
+ * yielded session cookie, which is what makes the CORS allow-list and
  * `credentials: true` load-bearing rather than decorative.
  */
 export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
@@ -89,31 +91,56 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const d1 = yield* Cloudflare.D1.QueryDatabase(database);
     const db = yield* drizzleD1(d1, { relations });
     const assets = yield* Cloudflare.R2.ReadWriteBucket(Assets);
-    const baseUrl = yield* Cloudflare.Worker.URL;
+    // Hourly, off the top of the hour: expired auth rows (sessions, attempts,
+    // limiter charges) are deleted, or every sign-in grows the tables forever.
+    yield* Cloudflare.Workers.cron("17 * * * *", () =>
+      cleanupExpired().pipe(Effect.provideService(Db, db)),
+    );
+    // The API's public origin is explicit stage configuration, not something
+    // init can derive: the `Worker.URL` accessor and the raw D1 binding only
+    // resolve per request behind alchemy's bridge `RuntimeContext`, which init
+    // never has (it runs at plan time and per isolate start). The old Better
+    // Auth setup deferred those reads per request behind `Effect.cached`;
+    // yielded needs the origin string at build, so the stage declares it.
+    // Reading it here also binds it as Worker env.
+    const origin = yield* ApiPublicOriginConfig;
 
-    const betterAuth = yield* makeBetterAuth({
-      database: d1,
-      assets,
-      baseUrl,
-      trustedOrigins: cors.allowedOrigins,
-    });
+    // Yielded owns the whole auth surface. `routes()` is its operation API
+    // (register/sign-in/session) with its request handling baked in — the
+    // managed-sqlite example mounts it standalone, no extra wrapping.
+    // The app Api keeps its own `Authentication` middleware, but that
+    // middleware resolves sessions through yielded's validated request, so
+    // the Api routes get `yielded.middleware` applied: it parses cookies and
+    // provides `AuthRequest` per request (kind "request" performs no origin
+    // or CSRF rejection — it only makes the credentials available), which
+    // `Authentication` declares in `requires`.
+    const yielded = makeYieldedHttp({ origin, allowedOrigins: cors.allowedOrigins });
+    const apiRoutes = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
+      Layer.provide([HealthHandlers, TodosApiHandlers.pipe(Layer.provide(AuthenticationLive))]),
+      // The request middleware validates its static configuration (origin
+      // shape, cookie names) at build; a failure is wiring in this file, so
+      // it dies rather than widening the Worker's error channel. Per-request
+      // failures stay typed inside the middleware.
+      (routes) => Layer.orDie(yielded.middleware(routes)),
+    );
+    // `routes()` builds yielded's operation API; a build failure here (cookie
+    // mismatch, contract drift) is a wiring defect in this file, not an
+    // operator error, so it dies instead of widening the Worker's channel.
+    const yieldedHttp = Layer.orDie(yielded.routes());
 
     return {
       fetch: yield* HttpRouter.toHttpEffect(
-        Layer.mergeAll(
-          HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-            Layer.provide([
-              HealthHandlers,
-              TodosApiHandlers.pipe(Layer.provide(AuthenticationLive)),
-            ]),
-          ),
-          authRoutes(betterAuth),
-          assetRoutes(assets),
-        ).pipe(
-          // The session middleware takes the `BetterAuth` tag rather than the
-          // instance, so it stays substitutable; this is where the instance is
-          // handed over.
-          Layer.provide([Db.layer(db), Layer.succeed(BetterAuth)(betterAuth)]),
+        Layer.mergeAll(apiRoutes, yieldedHttp, assetRoutes(assets)).pipe(
+          // The session middleware takes the yielded `AppAuth` tag rather
+          // than an instance, so it stays substitutable. Each `provide`
+          // feeds one layer's outputs downward while that layer's own
+          // requirements stay open for the next — a single
+          // `provide([AuthLive, Db.layer(db), ...])` would NOT let the
+          // sibling layers satisfy `AuthLive`'s `Db`/`SqlClient` needs.
+          // The full yielded stack (auth service, D1 persistence, keys) is
+          // handed over here.
+          Layer.provide(AuthLive),
+          Layer.provide(Db.layer(db)),
           // `consoleStructured`, not `consoleJson`: it hands `console.log` the
           // record as an *object*, and Workers Logs indexes a logged object's
           // fields into queryable columns. A JSON string would arrive as one
@@ -134,8 +161,10 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
               // `traceparent` and `b3` are sent by Effect's `HttpClient` to
               // propagate the trace across the call; without them the browser
               // fails the preflight.
-              allowedHeaders: ["content-type", "traceparent", "b3"],
-              // Better Auth authenticates with a session cookie, so the browser
+              // `x-effect-auth-csrf` is the header yielded's client sends on
+              // every auth mutation; without it the preflight fails silently.
+              allowedHeaders: ["content-type", "traceparent", "b3", "x-effect-auth-csrf"],
+              // yielded authenticates with a session cookie, so the browser
               // only sends it — and only accepts the response — when credentials
               // are allowed.
               credentials: true,
@@ -150,10 +179,11 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // `Tracer` over `tracing.startActiveSpan`, so `Effect.fn("Todos.list")`
     // frames nest inside Cloudflare's own fetch and D1 spans. There is still no
     // exporter, no OTLP endpoint and no flush — Cloudflare owns sampling and
-    // submission — and the only credential this Worker carries is `AUTH_SECRET`.
+    // submission — and the only credentials this Worker carries are the two auth keys.
     Effect.provide([
       Cloudflare.D1.QueryDatabaseBinding,
       Cloudflare.R2.ReadWriteBucketBinding,
+      Cloudflare.Workers.CronEventSourceLive,
       // Every event, for the reason ADR 0025 gave when this was a prop: on a
       // low-traffic stack a sampled trace is worse than no trace, because the
       // request you are chasing is the one that was dropped.

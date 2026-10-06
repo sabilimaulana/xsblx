@@ -1,5 +1,7 @@
 import { Context, Schema } from "effect";
 import { HttpApiMiddleware } from "effect/http-api";
+import { HttpRouter } from "effect/http";
+import { Auth } from "@yielded/auth";
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
@@ -20,9 +22,14 @@ export class CurrentUser extends Context.Service<
 /**
  * Declared here rather than in `apps/server` because it is part of the API
  * contract: it adds `Unauthorized` to every endpoint of the groups it guards.
- * The implementation (session lookup via Better Auth) lives on the server.
+ * The implementation (session lookup via yielded-auth) lives on the server.
+ *
+ * `requires` is yielded's validated request as a *request marker*, not a plain
+ * service: it is satisfied per request by the yielded HTTP middleware the
+ * server applies to these routes (the same shape yielded's own session
+ * security declares), never by a build-time layer.
  */
 export class Authentication extends HttpApiMiddleware.Service<
   Authentication,
-  { provides: CurrentUser }
+  { provides: CurrentUser; requires: HttpRouter.Request.From<"Requires", Auth.AuthRequest> }
 >()("api/Authentication", { error: Unauthorized }) {}

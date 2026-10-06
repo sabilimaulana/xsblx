@@ -7,13 +7,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@alchemy.run/better-auth": "catalog:alchemy",
-    "@better-auth/drizzle-adapter": "catalog:auth",
     "@effect/sql-d1": "catalog:effect",
     "@xsblx/api": "workspace:*",
+    "@yielded/auth": "catalog:yielded",
+    "@yielded/auth-persistence": "catalog:yielded",
+    "@yielded/crypto": "catalog:yielded",
     "alchemy": "catalog:alchemy",
-    "better-auth": "catalog:auth",
-    "blobatar": "2.2.0",
     "drizzle-orm": "catalog:",
     "effect": "catalog:effect",
     "nanoid": "6.0.1"

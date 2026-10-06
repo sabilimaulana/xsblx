@@ -1,9 +1,9 @@
 import { Schema } from "effect";
 
 /**
- * Auth endpoints belong to Better Auth, not to `Api` — but the credential rules
- * have to agree on both sides, so they live here once: the server feeds
- * `minPasswordLength` to `betterAuth`, and the web forms validate against these.
+ * The credential rules have to agree on both sides, so they live here once:
+ * the server feeds `MIN_PASSWORD_LENGTH` to yielded's new-password policy, and
+ * the web forms validate against these.
  */
 export const MIN_PASSWORD_LENGTH = 8;
 

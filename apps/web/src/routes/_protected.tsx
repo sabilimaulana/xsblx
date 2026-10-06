@@ -1,5 +1,5 @@
 import { Navigate, Outlet, createFileRoute } from "@tanstack/react-router";
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/session";
 
 /**
  * Routes that require a session. The session cookie lives in the browser, so
