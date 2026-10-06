@@ -16,6 +16,12 @@ in an ADR, not here — link it.
   guarantees. Proof persistence is now a fail-closed stub, and the password
   ports reject every reset. Real ports return with the reset feature.
 
+### Added
+
+- **An hourly cron on the API Worker deletes expired auth rows**: sessions,
+  session flows, password attempts and commands, and limiter charges older
+  than a day. Before, these tables grew by a row per sign-in, forever.
+
 ### Fixed
 
 - **A malformed origin fails the deploy, not every request.**

@@ -13,6 +13,7 @@ import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
 import { assetRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
+import { cleanupExpired } from "./features/auth/yielded-cleanup.ts";
 import { makeYieldedHttp } from "./features/auth/yielded-http.ts";
 import { AuthLive } from "./features/auth/yielded-live.ts";
 import { HealthHandlers } from "./features/health/http.ts";
@@ -90,6 +91,11 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     const d1 = yield* Cloudflare.D1.QueryDatabase(database);
     const db = yield* drizzleD1(d1, { relations });
     const assets = yield* Cloudflare.R2.ReadWriteBucket(Assets);
+    // Hourly, off the top of the hour: expired auth rows (sessions, attempts,
+    // limiter charges) are deleted, or every sign-in grows the tables forever.
+    yield* Cloudflare.Workers.cron("17 * * * *", () =>
+      cleanupExpired().pipe(Effect.provideService(Db, db)),
+    );
     // The API's public origin is explicit stage configuration, not something
     // init can derive: the `Worker.URL` accessor and the raw D1 binding only
     // resolve per request behind alchemy's bridge `RuntimeContext`, which init
@@ -177,6 +183,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     Effect.provide([
       Cloudflare.D1.QueryDatabaseBinding,
       Cloudflare.R2.ReadWriteBucketBinding,
+      Cloudflare.Workers.CronEventSourceLive,
       // Every event, for the reason ADR 0025 gave when this was a prop: on a
       // low-traffic stack a sampled trace is worse than no trace, because the
       // request you are chasing is the one that was dropped.
