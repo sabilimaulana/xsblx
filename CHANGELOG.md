@@ -18,6 +18,11 @@ in an ADR, not here — link it.
 
 ### Fixed
 
+- **Listing a user's sessions is keyset-paginated and indexed.** The query
+  pages over a new `(subject_id, session_id)` index on `xsblx_auth_sessions`,
+  filters expired rows in SQL, and reads the subject once per page instead of
+  twice per session.
+
 - **`@yielded/*` versions live once, in the root `catalog:yielded`.** Each
   workspace references the catalog, so a bump cannot leave two copies of
   `@yielded/auth` installed. The server lists `@yielded/auth` and

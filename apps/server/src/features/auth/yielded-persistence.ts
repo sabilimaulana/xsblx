@@ -20,7 +20,14 @@ import {
   sql,
 } from "drizzle-orm";
 import type { AnyColumn, SQL } from "drizzle-orm";
-import { getTableConfig, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  getTableConfig,
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { Context, Effect } from "effect";
 
@@ -41,6 +48,14 @@ import { Db } from "../../db/index.ts";
  * upstream's SQLite versions field for field; `operations` is drizzle
  * operators plus two small local helpers.
  */
+
+/**
+ * Indexes the hand-written ports query by, beyond yielded's unique keys.
+ * `SessionRepository.list` and `revokeAll` filter sessions by subject.
+ */
+const portIndexes: Readonly<Record<string, ReadonlyArray<readonly [string, ...Array<string>]>>> = {
+  xsblx_auth_sessions: [["subjectId", "sessionId"]],
+};
 
 const makeTable = (definition: StorageTable) =>
   sqliteTable(
@@ -64,13 +79,21 @@ const makeTable = (definition: StorageTable) =>
         }
         return column;
       };
-      return definition.unique.map((keys, i) => {
-        const [first, ...rest] = keys;
-        if (first === undefined) {
-          throw PersistenceConfigurationError.make({ reason: "An empty unique key is invalid" });
-        }
-        return uniqueIndex(`${definition.name}_key_${i}`).on(resolve(first), ...rest.map(resolve));
-      });
+      return [
+        ...definition.unique.map((keys, i) => {
+          const [first, ...rest] = keys;
+          if (first === undefined) {
+            throw PersistenceConfigurationError.make({ reason: "An empty unique key is invalid" });
+          }
+          return uniqueIndex(`${definition.name}_key_${i}`).on(
+            resolve(first),
+            ...rest.map(resolve),
+          );
+        }),
+        ...(portIndexes[definition.name] ?? []).map(([first, ...rest], i) =>
+          index(`${definition.name}_idx_${i}`).on(resolve(first), ...rest.map(resolve)),
+        ),
+      ];
     },
   );
 

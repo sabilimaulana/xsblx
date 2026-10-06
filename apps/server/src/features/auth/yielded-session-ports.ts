@@ -4,7 +4,7 @@ import { Schema as AuthSchema } from "@yielded/auth";
 import { coordinateCommit, LifecycleHooks } from "@yielded/auth/Hooks";
 import { AuthenticationAssurance } from "@yielded/auth/Operations";
 import { hooksLayer } from "@yielded/auth/Persistence";
-import { and, eq, lte } from "drizzle-orm";
+import { and, asc, eq, gt, lte } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
@@ -150,23 +150,13 @@ const readSessionByDigest = Effect.fn("YieldedD1.sessionByDigest")(function* (
 });
 
 /** A session row is live when the user revision still matches and time holds. */
-const validSession = Effect.fn("YieldedD1.validSession")(function* (
+/** The subject's account and password rows, which every session check reads. */
+const subjectState = Effect.fn("YieldedD1.subjectState")(function* (
   db: Db["Service"],
-  row: SessionRow,
-  provenanceRevision: Sessions.AuthenticationRevision,
-  now: number,
+  subjectId: string,
 ) {
-  const accounts = yield* live(db.select().from(user).where(eq(user.id, row.subjectId)));
-  const account = accounts[0];
-  if (
-    account === undefined ||
-    account.status !== "active" ||
-    account.securityRevision !== row.securityRevision ||
-    account.securityRevision !== provenanceRevision.securityRevision
-  ) {
-    return false;
-  }
-  const pwRows = (yield* live(
+  const accounts = yield* live(db.select().from(user).where(eq(user.id, subjectId)));
+  const passwordRows = (yield* live(
     db
       .select({
         credentialId: col(passwords, "credential_id"),
@@ -176,18 +166,39 @@ const validSession = Effect.fn("YieldedD1.validSession")(function* (
       .where(
         and(
           eq(col(passwords, "module_id"), AppAuth.strategies.password.persistence.moduleId),
-          eq(col(passwords, "subject_id"), row.subjectId),
+          eq(col(passwords, "subject_id"), subjectId),
         ),
       ),
   )) as Array<{ readonly credentialId: string; readonly credentialRevision: string }>;
-  return (
-    provenanceRevision.credentials.every((item) =>
-      pwRows.some(
-        (actual) =>
-          actual.credentialId === item.credentialId && actual.credentialRevision === item.revision,
-      ),
-    ) && now < Math.min(row.expiresAt, row.absoluteExpiresAt)
-  );
+  return { account: accounts[0], passwordRows };
+});
+
+/** A session is valid while its subject, revisions and credentials are current and it has not expired. */
+const sessionCurrent = (
+  state: Effect.Success<ReturnType<typeof subjectState>>,
+  row: SessionRow,
+  provenanceRevision: Sessions.AuthenticationRevision,
+  now: number,
+): boolean =>
+  state.account !== undefined &&
+  state.account.status === "active" &&
+  state.account.securityRevision === row.securityRevision &&
+  state.account.securityRevision === provenanceRevision.securityRevision &&
+  provenanceRevision.credentials.every((item) =>
+    state.passwordRows.some(
+      (actual) =>
+        actual.credentialId === item.credentialId && actual.credentialRevision === item.revision,
+    ),
+  ) &&
+  now < Math.min(row.expiresAt, row.absoluteExpiresAt);
+
+const validSession = Effect.fn("YieldedD1.validSession")(function* (
+  db: Db["Service"],
+  row: SessionRow,
+  provenanceRevision: Sessions.AuthenticationRevision,
+  now: number,
+) {
+  return sessionCurrent(yield* subjectState(db, row.subjectId), row, provenanceRevision, now);
 });
 
 const satisfies = Effect.fn("YieldedD1.sessionSatisfies")(function* (
@@ -573,6 +584,11 @@ export const SessionPortsLive = Layer.effectContext(
         list: (input) =>
           Effect.gen(function* () {
             const now = nowMillis();
+            // Keyset page over (subject_id, session_id), the index's order.
+            // Expired rows are filtered in SQL; revision and credential checks
+            // need the record, so they run per row against one read of the
+            // subject. A page may come back short; `nextCursor` still follows
+            // the SQL order.
             const rows = (yield* live(
               db
                 .select({
@@ -585,46 +601,47 @@ export const SessionPortsLive = Layer.effectContext(
                   record: col(sessions, "record"),
                 })
                 .from(sessions)
-                .where(eq(col(sessions, "subject_id"), String(input.subjectId))),
+                .where(
+                  and(
+                    eq(col(sessions, "subject_id"), String(input.subjectId)),
+                    gt(col(sessions, "session_id"), String(input.cursor ?? "")),
+                    gt(col(sessions, "expires_at"), now),
+                    gt(col(sessions, "absolute_expires_at"), now),
+                  ),
+                )
+                .orderBy(asc(col(sessions, "session_id")))
+                .limit(input.limit + 1),
             )) as Array<SessionRow>;
-            const liveRows: Array<{
-              readonly sessionId: string;
-              readonly assurance: AuthenticationAssurance;
-              readonly record: SessionRow;
-            }> = [];
-            for (const row of rows) {
-              const parsed = fromJson<{
-                readonly provenance: Sessions.SessionAuthenticationProvenance;
-                readonly assurance: StoredAssurance;
-              }>(row.record);
-              if (
-                row.sessionId.localeCompare(String(input.cursor ?? "")) > 0 &&
-                (yield* validSession(db, row, parsed.provenance.evidence.revision, now))
-              ) {
-                const assurance = yield* Effect.try({
-                  try: () => reviveAssurance(parsed.assurance),
-                  catch: () => Sessions.SessionUnavailable.make({}),
-                });
-                liveRows.push({
-                  sessionId: row.sessionId,
-                  assurance,
-                  record: row,
-                });
-              }
+            const page = rows.slice(0, input.limit);
+            const state = yield* subjectState(db, String(input.subjectId));
+            const items: Array<Sessions.SessionMetadata> = [];
+            for (const row of page) {
+              const parsed = yield* Effect.try({
+                try: () =>
+                  fromJson<{
+                    readonly provenance: Sessions.SessionAuthenticationProvenance;
+                    readonly assurance: StoredAssurance;
+                  }>(row.record),
+                catch: () => Sessions.SessionUnavailable.make({}),
+              });
+              if (!sessionCurrent(state, row, parsed.provenance.evidence.revision, now)) continue;
+              const assurance = yield* Effect.try({
+                try: () => reviveAssurance(parsed.assurance),
+                catch: () => Sessions.SessionUnavailable.make({}),
+              });
+              items.push({
+                sessionId: Sessions.SessionId.make(row.sessionId),
+                subjectId: AuthSchema.SubjectId.make(row.subjectId),
+                securityRevision: Sessions.SecurityRevision.make(row.securityRevision),
+                assurance,
+                issuedAt: dateTimeFromMillis(row.issuedAt),
+                expiresAt: dateTimeFromMillis(row.expiresAt),
+                absoluteExpiresAt: dateTimeFromMillis(row.absoluteExpiresAt),
+              });
             }
-            liveRows.sort((a, b) => a.sessionId.localeCompare(b.sessionId));
-            const page = liveRows.slice(0, input.limit);
             return {
-              sessions: page.map((item) => ({
-                sessionId: Sessions.SessionId.make(item.record.sessionId),
-                subjectId: AuthSchema.SubjectId.make(item.record.subjectId),
-                securityRevision: Sessions.SecurityRevision.make(item.record.securityRevision),
-                assurance: item.assurance,
-                issuedAt: dateTimeFromMillis(item.record.issuedAt),
-                expiresAt: dateTimeFromMillis(item.record.expiresAt),
-                absoluteExpiresAt: dateTimeFromMillis(item.record.absoluteExpiresAt),
-              })),
-              ...(liveRows.length > page.length
+              sessions: items,
+              ...(rows.length > page.length
                 ? { nextCursor: page[page.length - 1]?.sessionId }
                 : {}),
             };
