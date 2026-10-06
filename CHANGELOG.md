@@ -9,6 +9,13 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Removed
+
+- **The D1 proof ports.** Nothing could reach them — no reset endpoint, no
+  verified identifier — and they did not hold the contract's single-use
+  guarantees. Proof persistence is now a fail-closed stub, and the password
+  ports reject every reset. Real ports return with the reset feature.
+
 ### Fixed
 
 - **`@yielded/*` versions live once, in the root `catalog:yielded`.** Each

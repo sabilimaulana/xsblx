@@ -1,5 +1,4 @@
-import { Password, Sessions } from "@yielded/auth";
-import { EmailDelivery } from "@yielded/auth";
+import { EmailDelivery, Password, Proofs, Sessions } from "@yielded/auth";
 import { layerWebCrypto } from "@yielded/crypto/WebCrypto";
 import { Effect, Layer, Option, Schema } from "effect";
 
@@ -8,7 +7,6 @@ import { HashingLive, PasswordPolicyLive, ScreeningLive } from "./yielded-hashin
 import { KeysLive } from "./yielded-keys.ts";
 import { PasswordPortsLive } from "./yielded-password-ports.ts";
 import { ClaimsLive } from "./yielded-storage.ts";
-import { ProofPortsLive } from "./yielded-proof-ports.ts";
 import { SessionPortsLive } from "./yielded-session-ports.ts";
 
 /**
@@ -93,6 +91,26 @@ const FailClosedDelivery = Layer.succeed(
 );
 
 /**
+ * Proofs (reset codes) do not exist yet: no reset endpoint is mounted, no
+ * identifier is ever verified, and delivery fails closed. The password module
+ * still requires proof persistence statically, so every method fails with
+ * `ProofUnavailable`. Real ports come with the reset feature, and each of
+ * their mutations must commit through one D1 batch.
+ */
+const FailClosedProofs = Layer.succeed(
+  Proofs.ProofPersistence,
+  Proofs.ProofPersistence.of({
+    issue: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    attempt: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    complete: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    claimDelivery: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    settleDelivery: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    cancel: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+    cleanup: () => Effect.fail(Proofs.ProofUnavailable.make({})),
+  }),
+);
+
+/**
  * Password mutations (change/reset) do not exist yet — signup and
  * sign-in are the whole surface. The password module still requires an
  * action-evidence service statically, so this denies every mutation with
@@ -126,7 +144,7 @@ const CoreLive = AppAuth.layer.pipe(
   // claims wrapper that need it, not before.
   Layer.provideMerge(PasswordPortsLive),
   Layer.provideMerge(SessionPortsLive),
-  Layer.provideMerge(ProofPortsLive),
+  Layer.provideMerge(FailClosedProofs),
   // Exposed at the top level, not only inside `SessionClaimsLive`'s
   // construction: sign-in resolves claims and screens passwords through the
   // auth layer directly.

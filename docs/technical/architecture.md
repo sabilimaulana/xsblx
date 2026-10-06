@@ -145,7 +145,7 @@ a shared schema; the server and the web client are both built from it.
 | Shared      | `packages/api/src/features/auth/credentials.ts`       | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up form schemas).                                      |
 | Service     | `apps/server/src/features/auth/yielded-auth.ts`       | `AppAuth` — `Auth.make` with the password strategy and stateful sessions.                               |
 | Assembly    | `apps/server/src/features/auth/yielded-live.ts`       | `AuthLive` — ports, hashing, keys, WebCrypto, fail-closed delivery.                                     |
-| Ports       | `apps/server/src/features/auth/yielded-*-ports.ts`    | Password, session and proof persistence on D1; multi-row writes go through one `batch`. The D1 attempt limiter. |
+| Ports       | `apps/server/src/features/auth/yielded-*-ports.ts`    | Password and session persistence on D1; multi-row writes go through one `batch`. The D1 attempt limiter. Proof (reset) persistence is a fail-closed stub in `yielded-live.ts` until reset is built. |
 | Tables      | `apps/server/src/features/auth/yielded-tables.ts`     | yielded's managed tables plus `xsblx_auth_password_attempt_charges`, re-exported through `db/schema.ts`. |
 | Subject     | `apps/server/src/features/auth/schema.ts`             | `user`: `id`, `displayName`, `status`, `securityRevision`.                                              |
 | Hashing     | `apps/server/src/features/auth/yielded-hashing.ts`    | Argon2id on `@yielded/crypto/Portable`, one shared KDF admission.                                       |

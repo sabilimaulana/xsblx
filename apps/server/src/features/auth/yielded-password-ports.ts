@@ -12,7 +12,6 @@ import { Db } from "../../db/index.ts";
 import { newId } from "../../id.ts";
 import { AppAuth } from "./yielded-auth.ts";
 import { user } from "./schema.ts";
-import { consumeProofCompletion, proofCompletionCurrent } from "./yielded-proof-ports.ts";
 import { atomically, nowMillis } from "./yielded-support.ts";
 import {
   credentials,
@@ -575,65 +574,11 @@ export const PasswordPortsLive = Layer.effectContext(
             return receipt;
           }),
         ),
-      checkReset: (input) =>
-        proofCompletionCurrent(db, input, nowMillis()).pipe(
-          Effect.mapError(() => Password.PasswordUnavailable.make({})),
-        ),
-      resetWithProof: (input, prepare) =>
-        withCommit((journal) =>
-          Effect.gen(function* () {
-            const now = nowMillis();
-            const { authorization } = input;
-            const replayed = (yield* live(
-              db
-                .select({ commandId: col(passwordCommands, "command_id") })
-                .from(passwordCommands)
-                .where(
-                  and(
-                    eq(col(passwordCommands, "module_id"), moduleId),
-                    eq(col(passwordCommands, "command_id"), input.commandId),
-                  ),
-                ),
-            )) as Array<{ readonly commandId: string }>;
-            const completionOk = yield* proofCompletionCurrent(
-              db,
-              input.completion.input,
-              now,
-            ).pipe(Effect.mapError(() => Password.PasswordUnavailable.make({})));
-            const current =
-              authorization.challenge.action === "reset-password" &&
-              input.completion.input.binding._tag === "Subject" &&
-              input.completion.input.binding.revision.subjectId ===
-                input.expectedRevision.subjectId &&
-              completionOk &&
-              input.credential !== undefined &&
-              (yield* revisionCurrent(db, input.expectedRevision)) &&
-              (yield* revisionCurrent(db, authorization.challenge.revision));
-            if (!current || replayed.length > 0) {
-              return prepare("rejected", journal);
-            }
-            const receipt = prepare("changed", journal);
-            input.completion.prepare("completed", journal, () => undefined);
-            yield* consumeProofCompletion(db, input.completion.input).pipe(
-              Effect.mapError(() => Password.PasswordUnavailable.make({})),
-            );
-            yield* replace(
-              db,
-              input.expectedRevision.subjectId,
-              input.credential.credentialId,
-              input.replacement,
-            );
-            yield* recordCommand(
-              db,
-              input.commandId,
-              "reset-password",
-              authorization.challenge.bindingDigest,
-              "changed",
-              now,
-            );
-            return receipt;
-          }),
-        ),
+      // Reset is not built (see `FailClosedProofs`): no completion is ever
+      // current, and every reset is rejected.
+      checkReset: () => Effect.succeed(false),
+      resetWithProof: (_input, prepare) =>
+        withCommit((journal) => Effect.succeed(prepare("rejected", journal))),
       cleanupAttempts: (input, prepare) =>
         withCommit((journal) =>
           Effect.gen(function* () {
