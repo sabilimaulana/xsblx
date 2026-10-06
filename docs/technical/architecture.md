@@ -290,6 +290,11 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **A password sign-in or registration costs ~2–3s on a Worker.** Argon2id runs
   in JavaScript (`@yielded/crypto/Portable`) on the request thread; a wrong
   password and an unknown address pay the same to keep timing flat (ADR 0030).
+- **There is no deployment-wide sign-in limit.** The D1 attempt limiter
+  charges per email and per subject only; yielded's single `sign-in` action
+  bucket is not charged, because anyone could exhaust it and lock every user
+  out. Volume across all addresses needs a Cloudflare rate-limiting rule in
+  front of `/api/auth/*`, which the stack does not declare yet.
 - **A `workers.dev` stage cannot hold a browser session.** The cookie is
   `SameSite=Lax`, and two `workers.dev` hostnames are different sites (ADR 0030).
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset

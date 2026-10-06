@@ -78,6 +78,12 @@ const live = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, Password.Pass
  * write in a single statement, which D1 serializes — so concurrent attempts
  * cannot all read a count under the limit and all get through. Expired rows
  * for the key are pruned on each check.
+ *
+ * The `action` scope is not charged. yielded keys it on the action alone
+ * (`"sign-in"`), one bucket for the whole deployment: in D1 that is a hot key
+ * every sign-in writes, and anyone can exhaust it to lock every user out.
+ * The identifier and subject budgets still apply; deployment-wide volume is
+ * Cloudflare rate limiting's job, in front of the Worker.
  */
 const AttemptLimiterLive = Layer.effect(
   Password.PasswordAttemptLimiter,
@@ -86,6 +92,7 @@ const AttemptLimiterLive = Layer.effect(
     const c = passwordAttemptCharges;
     return Password.PasswordAttemptLimiter.of({
       check: Effect.fn("YieldedD1.attemptLimit")(function* (input) {
+        if (input.scope === "action") return;
         const now = nowMillis();
         const since = now - input.budget.windowMillis;
         yield* live(

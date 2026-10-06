@@ -18,6 +18,10 @@ in an ADR, not here — link it.
 
 ### Fixed
 
+- **One client can no longer lock every user out of sign-in.** The D1 attempt
+  limiter no longer charges yielded's deployment-wide `sign-in` bucket; the
+  per-email and per-subject budgets still apply.
+
 - **Listing a user's sessions is keyset-paginated and indexed.** The query
   pages over a new `(subject_id, session_id)` index on `xsblx_auth_sessions`,
   filters expired rows in SQL, and reads the subject once per page instead of
