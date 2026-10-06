@@ -11,6 +11,11 @@ in an ADR, not here — link it.
 
 ### Fixed
 
+- **`@yielded/*` versions live once, in the root `catalog:yielded`.** Each
+  workspace references the catalog, so a bump cannot leave two copies of
+  `@yielded/auth` installed. The server lists `@yielded/auth` and
+  `@yielded/crypto` as runtime dependencies.
+
 - **The `user` rebuild migration no longer empties `todos`.**
   `20261004053311_cute_lady_bullseye` drops and recreates `user`, which on D1
   cascaded into every todo; it now copies `todos` aside and restores them.

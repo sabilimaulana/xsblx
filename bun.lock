@@ -24,7 +24,9 @@
       "dependencies": {
         "@effect/sql-d1": "catalog:effect",
         "@xsblx/api": "workspace:*",
-        "@yielded/auth-persistence": "0.1.0-beta.23",
+        "@yielded/auth": "catalog:yielded",
+        "@yielded/auth-persistence": "catalog:yielded",
+        "@yielded/crypto": "catalog:yielded",
         "alchemy": "catalog:alchemy",
         "drizzle-orm": "catalog:",
         "effect": "catalog:effect",
@@ -34,8 +36,6 @@
         "@cloudflare/workers-types": "catalog:",
         "@effect/vitest": "catalog:effect",
         "@types/bun": "latest",
-        "@yielded/auth": "0.1.0-beta.23",
-        "@yielded/crypto": "0.1.0-beta.23",
         "typescript": "catalog:",
         "vitest": "^5.0.1",
       },
@@ -49,8 +49,8 @@
         "@tanstack/react-start": "latest",
         "@xsblx/api": "workspace:*",
         "@xsblx/ui": "workspace:*",
-        "@yielded/auth": "0.1.0-beta.23",
-        "@yielded/crypto": "0.1.0-beta.23",
+        "@yielded/auth": "catalog:yielded",
+        "@yielded/crypto": "catalog:yielded",
         "effect": "catalog:effect",
         "effect-query": "1.0.0",
         "lucide-react": "catalog:",
@@ -76,7 +76,7 @@
       "name": "@xsblx/api",
       "version": "0.0.0",
       "dependencies": {
-        "@yielded/auth": "0.1.0-beta.23",
+        "@yielded/auth": "catalog:yielded",
         "effect": "catalog:effect",
       },
       "devDependencies": {
@@ -131,6 +131,11 @@
       "@effect/sql-d1": "4.0.0",
       "@effect/vitest": "4.0.0",
       "effect": "4.0.0",
+    },
+    "yielded": {
+      "@yielded/auth": "0.1.0-beta.23",
+      "@yielded/auth-persistence": "0.1.0-beta.23",
+      "@yielded/crypto": "0.1.0-beta.23",
     },
   },
   "packages": {

@@ -33,9 +33,9 @@ Shared dependency versions live in the root `package.json` catalogs, not in each
 workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss,
 drizzle), `catalog:effect` for `effect`, `@effect/sql-d1`, the platform packages
 and `@effect/vitest`, which move as one version set (ADR 0028),
-and `catalog:alchemy` for `alchemy`, which moves together with `repos/alchemy`.
-The `@yielded/*` packages are pre-1.0 and pinned exactly in the workspaces that
-use them (ADR 0030).
+`catalog:alchemy` for `alchemy`, which moves together with `repos/alchemy`, and
+`catalog:yielded` for the `@yielded/*` packages, which are pre-1.0 and pinned
+exactly (ADR 0030).
 
 Configuration is one root `.env` (template `.env.example`), with per-stage
 overrides in `.env.<stage>.local` passed via `--env-file` (ADR 0024), because

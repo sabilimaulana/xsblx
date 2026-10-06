@@ -72,7 +72,8 @@ from broken.
   persistence contracts. A yielded release that changes those contracts is a code
   change here, not a version bump. If yielded ships a D1 composition that builds
   without I/O, the ports are deleted in favour of it.
-- yielded is pre-1.0 (`beta`). Its versions are pinned exactly.
+- yielded is pre-1.0 (`beta`). Its versions are pinned exactly, once, in the
+  root `catalog:yielded`.
 - Argon2id runs in JavaScript (`@yielded/crypto/Portable`): a password
   sign-in or registration costs ~2–3s on a Worker. Tuning the hash cost is a
   later decision.
