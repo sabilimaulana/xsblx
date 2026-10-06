@@ -17,7 +17,7 @@ The whole deploy is one alchemy program (ADR 0019).
 | Backend   | Effect `4.0.0-beta.103`, `HttpApi`, `@effect/sql-d1` over a binding   |
 | Database  | Cloudflare D1 via `drizzle-orm/sqlite-core` (ADR 0020)                |
 | Storage   | Cloudflare R2, one bucket, `public/*` served by the Worker (ADR 0021) |
-| Auth      | Better Auth as a service on the same D1 (ADR 0007, ADR 0022)          |
+| Auth      | yielded-auth, D1-backed, contract in `packages/api` (ADR 0030)        |
 | Telemetry | Axiom — datasets, ingest token and exporter as resources (ADR 0023)   |
 | Frontend  | TanStack Start / Router / Query / Form, React 19                      |
 | UI        | shadcn components in `packages/ui`, Tailwind 4                        |
@@ -44,7 +44,7 @@ is the filename (ADR 0005). `features/todos/` is the reference slice.
 ```sh
 bun install
 ./scripts/vendor.sh                  # reference sources into repos/ (effect, alchemy, …)
-cp .env.example .env                 # set AUTH_SECRET
+cp .env.example .env                 # set AUTH_PROOF_KEY, AUTH_BINDING_KEY
 bun alchemy profile                  # Cloudflare credentials, stored in ~/.alchemy
 ```
 
@@ -54,7 +54,7 @@ alone — OAuth, or an API token. The credential does not belong in `.env`.
 an expired one.
 
 `.env` is read by `alchemy`, not by an app: a `Config` value a Worker resolves in
-its init phase is bound onto the deployed Worker as a secret, so `AUTH_SECRET`
+its init phase is bound onto the deployed Worker as a secret, so the auth keys
 and `CORS_ALLOWED_ORIGINS` live in one file for dev and deploys alike. Cloudflare
 credentials are not in it.
 

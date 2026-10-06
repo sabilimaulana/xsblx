@@ -28,14 +28,13 @@ import { AppAuth } from "./yielded-auth.ts";
 import { Db } from "../../db/index.ts";
 
 /**
- * Spike: D1 backend for yielded-auth on the `yielded-auth` branch.
+ * D1 backend for yielded-auth.
  *
  * Upstream ships this composition only for its SQLite drivers
  * (`sqlitePersistence` in `@yielded/auth-persistence-drizzle` internals);
  * the D1 driver exposes per-workflow factories instead, with no example
  * wiring them. This file mirrors the SQLite composition for D1 — same
- * kernels, same table shapes, D1 acquire — so the spike evaluates the real
- * path rather than a second database. If yielded gains a D1 `managed`
+ * kernels, same table shapes, D1 acquire. If yielded gains a D1 `managed`
  * helper, delete this file and use it.
  *
  * Table shapes (`makeTable`/`describe`) and the D1 statement helpers match

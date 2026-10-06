@@ -19,7 +19,7 @@ import { passwords, sessionFlows, sessions } from "./yielded-tables.ts";
 import { signInRequirement } from "./yielded-storage.ts";
 
 /**
- * Spike (yielded-auth): hand-written D1 session ports.
+ * Hand-written D1 session ports.
  *
  * Same story as the password ports (see `yielded-password-ports.ts`): the
  * composed layer's interactive kernels cannot run on D1, so
@@ -42,7 +42,7 @@ const live = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, Sessions.Sess
 const col = (table: SQLiteTable, name: string): AnyColumn => {
   const found = getTableConfig(table).columns.find((column) => column.name === name);
   if (found === undefined) {
-    throw new Error(`[yielded-auth spike] table has no column ${name}`);
+    throw new Error(`[yielded-auth] table has no column ${name}`);
   }
   return found as AnyColumn;
 };

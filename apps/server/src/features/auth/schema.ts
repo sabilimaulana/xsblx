@@ -1,7 +1,7 @@
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
- * The yielded subject. Native to yielded-auth (no Better Auth lineage):
+ * The yielded subject (ADR 0030):
  * identity (`id`), profile (`displayName`), liveness (`status`) and the
  * security revision sessions bind to. The login email lives ONLY in
  * yielded's identifiers table — this row never stores it, so there is no

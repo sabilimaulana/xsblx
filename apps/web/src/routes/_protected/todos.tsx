@@ -10,7 +10,8 @@ import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-q
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { api, eq } from "@/lib/api-client";
-import { signOut, useSession } from "@/lib/auth-client";
+import { auth } from "@/lib/api-client";
+import { sessionKey, useSession } from "@/lib/session";
 
 export const Route = createFileRoute("/_protected/todos")({ component: Todos });
 
@@ -76,6 +77,19 @@ function Todos() {
     }),
   );
 
+  // Sign-out revokes the session server-side and clears the cookie; dropping
+  // every cached query keeps one user's todos from flashing for the next.
+  const signOut = useMutation(
+    eq.mutationOptions({
+      mutationKey: ["auth", "sign-out"],
+      mutationFn: () => auth((client) => client.signOut()),
+      onSettled: () => {
+        queryClient.removeQueries({ queryKey: todosKey });
+        return queryClient.invalidateQueries({ queryKey: sessionKey });
+      },
+    }),
+  );
+
   const remove = useMutation(
     eq.mutationOptions({
       mutationKey: ["todos", "remove"],
@@ -99,14 +113,9 @@ function Todos() {
     <div className="mx-auto flex max-w-xl flex-col gap-4 p-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {/* Assigned at registration and served straight from the object store
-              (ADR 0018), so there is nothing to generate or cache here. */}
-          {session?.user.image ? (
-            <img src={session.user.image} alt="" className="size-8 rounded-full" />
-          ) : null}
-          <span className="text-muted-foreground text-sm">{session?.user.email}</span>
+          <span className="text-muted-foreground text-sm">{session?.claims.email}</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => void signOut()}>
+        <Button variant="ghost" size="sm" onClick={() => signOut.mutate(undefined)}>
           Sign out
         </Button>
       </div>

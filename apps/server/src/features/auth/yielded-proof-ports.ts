@@ -24,7 +24,7 @@ import {
 } from "./yielded-tables.ts";
 
 /**
- * Spike (yielded-auth): hand-written D1 proof ports.
+ * Hand-written D1 proof ports.
  *
  * Same story as the password/session ports: sequential D1 statements, pure
  * layer build, `coordinateCommit` around mutating methods. Logic mirrors
@@ -36,7 +36,7 @@ import {
  *   column); the policy arriving with each call is used. Policy is static
  *   app config, so stored and arriving values are the same object.
  * - The continuations `version` column is written as `"1"`: nothing in the
- *   spike reads it (completion checks proof state, not continuation
+ *   app reads it (completion checks proof state, not continuation
  *   version), and kernels never read tables except through these ports.
  *
  * Reset-address reality: only `${password}/reset` + `password-reset` is a
@@ -53,7 +53,7 @@ const pwdModule = AppAuth.strategies.password.persistence.moduleId;
 const col = (table: SQLiteTable, name: string): AnyColumn => {
   const found = getTableConfig(table).columns.find((column) => column.name === name);
   if (found === undefined) {
-    throw new Error(`[yielded-auth spike] table has no column ${name}`);
+    throw new Error(`[yielded-auth] table has no column ${name}`);
   }
   return found as AnyColumn;
 };

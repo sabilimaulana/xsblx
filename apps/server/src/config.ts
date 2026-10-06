@@ -40,25 +40,6 @@ export const ApiDomainConfig = domain("API_DOMAIN");
 export const WebDomainConfig = domain("WEB_DOMAIN");
 
 /**
- * `SameSite` on the session cookie — the one thing a shared registrable domain
- * buys us (ADR 0024).
- *
- * `none` is the default because it is the only value that works when the API and
- * the website are different *sites*, which is what two `workers.dev` hostnames
- * are. A stage that puts both Workers under one registrable domain sets `lax`
- * instead, and the cookie stops being third-party.
- *
- * Declared, never derived: working out whether two hostnames share a registrable
- * domain means consulting the Public Suffix List, and guessing wrong in the
- * `lax` direction silently signs everyone out.
- */
-export const SessionCookieConfig = Config.all({
-  sameSite: Config.Literals(["lax", "none"], "SESSION_COOKIE_SAMESITE").pipe(
-    Config.withDefault("none" as const),
-  ),
-});
-
-/**
  * What Cloudflare records about a Worker (ADR 0025, ADR 0026).
  *
  * A literal rather than a `Config`, because it is not per-stage: a stage that

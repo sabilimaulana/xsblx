@@ -2,10 +2,9 @@ import { Auth, Proofs } from "@yielded/auth";
 import { Config, Effect, Layer, Schema } from "effect";
 
 /**
- * Spike: session proof + request-binding keyrings.
+ * Session proof + request-binding keyrings.
  *
- * Better Auth signed everything off one `AUTH_SECRET`. Yielded separates the
- * proof key (session validity) from the request-binding key (CSRF-grade
+ * Yielded separates the proof key (session validity) from the request-binding key (CSRF-grade
  * request credentials). Both arrive as Worker secrets; generate with
  * `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='` (32 bytes, base64url).
  *
@@ -13,7 +12,7 @@ import { Config, Effect, Layer, Schema } from "effect";
  * `ConfigError` — the one operator-actionable failure in the yielded stack —
  * rather than a bespoke error type. The pattern pins the shape: 43+ base64url
  * chars decode to 32+ bytes. Rotation story is a follow-up: the keyring
- * supports multiple key ids, but the spike runs a single `v1` key.
+ * supports multiple key ids, but only a single `v1` key runs today.
  */
 const KeyMaterial = Schema.Redacted(
   Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Za-z0-9_-]{43,}$/))),

@@ -22,12 +22,7 @@
     },
     "catalogs": {
       "alchemy": {
-        "@alchemy.run/better-auth": "2.0.0-beta.80",
         "alchemy": "2.0.0-beta.80"
-      },
-      "auth": {
-        "@better-auth/drizzle-adapter": "1.7.5",
-        "better-auth": "1.7.5"
       },
       "effect": {
         "@effect/platform-bun": "4.0.0",

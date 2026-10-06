@@ -1,5 +1,5 @@
 import { Navigate, Outlet, createFileRoute } from "@tanstack/react-router";
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/session";
 
 /**
  * Routes only a signed-out visitor should see — sign-in, sign-up. Mirror of

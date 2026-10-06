@@ -15,7 +15,6 @@ VENDORED=(
   # Tracks the catalog:alchemy pin (ADR 0028).
   "alchemy|alchemy-run/alchemy|v2.0.0-beta.80"
   "effect-query|voidhashcom/effect-query|v1.0.4"
-  "better-auth|better-auth/better-auth|v1.7.5"
   "effect-machine|typeonce-dev/effect-machine|@typeonce/effect-machine@0.3.0"
 )
 

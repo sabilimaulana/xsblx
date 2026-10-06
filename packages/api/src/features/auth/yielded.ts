@@ -2,15 +2,13 @@ import { AuthContract, Password, Schema as AuthSchema, Sessions } from "@yielded
 import { Schema } from "effect";
 
 /**
- * Spike contract for yielded-auth on the `yielded-auth` branch.
+ * The yielded-auth contract (ADR 0030). The server mounts it with `Http.make`
+ * and the web builds its client from it, so both sides share one shape.
  *
- * Password-only: signup (register), sign-in, session. No email verification,
- * no reset delivery, no passkey/OAuth — those are the follow-ups if the spike
- * proves the D1 path. Claims stay `{ displayName, email }` so the web forms
- * and `CurrentUser` do not change shape.
+ * Password-only: signup (register), sign-in, session, sign-out. No email
+ * verification, no reset delivery, no passkey/OAuth yet. Claims are
+ * `{ displayName, email }`.
  */
-export const minimumPasswordLength = 8;
-
 export const Registration = Schema.Struct({
   displayName: Schema.NonEmptyString.check(Schema.isMaxLength(80)),
   email: Schema.String.check(Schema.isMaxLength(320)),

@@ -26,7 +26,7 @@ import {
 } from "./yielded-tables.ts";
 
 /**
- * Spike (yielded-auth): hand-written D1 password ports.
+ * Hand-written D1 password ports.
  *
  * The composed `BoundPersistence.layer` builds the *interactive-transaction*
  * SQL kernels and validates storage with live queries at layer build — both
@@ -62,7 +62,7 @@ const moduleId = AppAuth.strategies.password.persistence.moduleId;
 const col = (table: SQLiteTable, name: string): AnyColumn => {
   const found = getTableConfig(table).columns.find((column) => column.name === name);
   if (found === undefined) {
-    throw new Error(`[yielded-auth spike] table has no column ${name}`);
+    throw new Error(`[yielded-auth] table has no column ${name}`);
   }
   return found as AnyColumn;
 };

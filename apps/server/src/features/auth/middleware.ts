@@ -6,7 +6,7 @@ import { HttpRouter, HttpServerRequest } from "effect/http";
 import { AppAuth } from "./yielded-auth.ts";
 
 /**
- * Spike: session middleware on yielded-auth.
+ * Session middleware on yielded-auth (ADR 0030).
  *
  * Resolves the session cookie into `CurrentUser` through the yielded session
  * API. Anonymous, expired, or revoked sessions are a 401 (`Unauthorized`),

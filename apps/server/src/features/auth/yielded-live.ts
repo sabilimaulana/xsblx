@@ -12,10 +12,10 @@ import { ProofPortsLive } from "./yielded-proof-ports.ts";
 import { SessionPortsLive } from "./yielded-session-ports.ts";
 
 /**
- * Spike: yielded service assembly for D1.
+ * yielded service assembly for D1.
  *
  * Mirrors the managed-sqlite example's `live.ts`, minus migrations (alchemy
- * owns DDL from the app schema), email/passkey/TOTP (not in the spike), and
+ * owns DDL from the app schema), email/passkey/TOTP (not built yet), and
  * delivery/screening (no email/SMS yet). Session verification re-checks the
  * password revision so a password change invalidates existing sessions.
  */
@@ -59,7 +59,7 @@ const SessionClaimsLive = Layer.effect(
 );
 
 /**
- * Spike: explicit D1 ports for plan AND real boots.
+ * Explicit D1 ports for plan AND real boots.
  *
  * The composed `BoundPersistence.layer` builds interactive-transaction
  * kernels and validates storage with live queries at layer build — both die
@@ -78,8 +78,8 @@ const SessionClaimsLive = Layer.effect(
  */
 
 /**
- * Spike: delivery fail-closed. The management strategy statically requires an
- * `EmailDelivery` service (reset codes are configured), but the spike wires
+ * Delivery fails closed. The management strategy statically requires an
+ * `EmailDelivery` service (reset codes are configured), but nothing wires
  * no transport — there is nothing to send through on a Worker without an
  * email provider. Every send fails with `EmailAcceptanceUnknown`, so a reset
  * attempt surfaces a delivery error instead of pretending it worked. A real
@@ -93,11 +93,11 @@ const FailClosedDelivery = Layer.succeed(
 );
 
 /**
- * Spike: password mutations (change/reset) do not exist yet — signup and
+ * Password mutations (change/reset) do not exist yet — signup and
  * sign-in are the whole surface. The password module still requires an
  * action-evidence service statically, so this denies every mutation with
  * `PasswordActionRequired` rather than leaving the tag unprovided. Wiring a
- * real policy here is part of the change-password follow-up, not the spike.
+ * real policy here is part of the change-password follow-up.
  */
 const PasswordMutationsDeny = Layer.succeed(
   Password.PasswordActionEvidence,

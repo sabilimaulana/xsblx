@@ -3,7 +3,7 @@ import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { storage } from "./yielded-storage.ts";
 
 /**
- * Spike: yielded managed tables as static exports.
+ * yielded managed tables as static exports.
  *
  * `storage.schema` builds the tables at import time (pure table construction,
  * no I/O), but alchemy's `Drizzle.Schema` diffs the schema file's top-level

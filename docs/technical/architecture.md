@@ -1,7 +1,7 @@
 ---
 status: active
-version: 2.3.0
-updated: 2026-09-18
+version: 3.0.0
+updated: 2026-10-06
 ---
 
 # Architecture
@@ -33,15 +33,17 @@ Shared dependency versions live in the root `package.json` catalogs, not in each
 workspace — `catalog:` for the common set (typescript, vite, react, tailwindcss,
 drizzle), `catalog:effect` for `effect`, `@effect/sql-d1`, the platform packages
 and `@effect/vitest`, which move as one version set (ADR 0028),
-`catalog:alchemy` for `alchemy` and `@alchemy.run/better-auth`, which move
-together with `repos/alchemy`, and `catalog:auth` for `better-auth`.
+and `catalog:alchemy` for `alchemy`, which moves together with `repos/alchemy`.
+The `@yielded/*` packages are pre-1.0 and pinned exactly in the workspaces that
+use them (ADR 0030).
 
 Configuration is one root `.env` (template `.env.example`), with per-stage
 overrides in `.env.<stage>.local` passed via `--env-file` (ADR 0024), because
 `alchemy` is what reads them: a `Config` value resolved in a Worker's init phase
-is bound onto the deployed Worker as a secret. Every stage sets `AUTH_SECRET`
-and `CORS_ALLOWED_ORIGINS`; a stage on custom domains adds `API_DOMAIN`,
-`WEB_DOMAIN` and `SESSION_COOKIE_SAMESITE`. Cloudflare credentials are in
+is bound onto the deployed Worker as a secret. Every stage sets `AUTH_PROOF_KEY`,
+`AUTH_BINDING_KEY`, `API_PUBLIC_ORIGIN` and `CORS_ALLOWED_ORIGINS`; a stage whose
+website signs users in adds `API_DOMAIN` and `WEB_DOMAIN` under one registrable
+domain, because the session cookie is `SameSite=Lax` (ADR 0030). Cloudflare credentials are in
 neither file; `alchemy profile` stores them under `~/.alchemy`, and CI passes
 `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` instead.
 
@@ -51,7 +53,7 @@ neither file; `alchemy profile` stores them under `~/.alchemy`, and CI passes
 alchemy.run.ts                    one stack, "xsblx"
 ├── Drizzle.Schema  "Schema"      generates pending migration SQL → apps/server/drizzle/
 ├── D1.Database     "Database"    applies it (migrations: Schema, ledger __alchemy_migrations)
-├── R2.Bucket       "Assets"      public/avatars/<id>.svg
+├── R2.Bucket       "Assets"      public/* (empty today)
 ├── Worker          "Api"         apps/server/src/worker.ts — HttpApi + /api/auth/* + /public/*
 └── Website.Vite    "Website"     apps/web — SSR Worker + static assets, VITE_API_URL = Api.url
 ```
@@ -133,38 +135,30 @@ script.
 
 ## Auth
 
-Better Auth 1.7.5, email + password only. Runs outside the Effect runtime
-and does not follow the slice (ADR 0007), and on a Worker it is a service rather
-than a module singleton (ADR 0022).
+yielded-auth `0.1.0-beta.23`, email + password only (ADR 0030). The contract is
+a shared schema; the server and the web client are both built from it.
 
-| Layer     | File                                            | Responsibility                                                                                                             |
-| --------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Service   | `apps/server/src/features/auth/auth.ts`         | `makeBetterAuth` — builds the `BetterAuth` service once per isolate inside `Effect.cached` from the D1 and R2 bindings. |
-| Schema    | `apps/server/src/features/auth/schema.ts`       | Auth tables, re-exported through the `db/schema.ts` barrel.                                                                |
-| Relations | `apps/server/src/db/relations.ts`               | `defineRelations` — user↔sessions, user↔accounts. Passed to `Drizzle`.                                                     |
-| Mount     | `apps/server/src/features/auth/http.ts`         | Raw `HttpRouter` route at `/api/auth/*`, plus `GET /public/*` for assets.                                                  |
-| Avatars   | `apps/server/src/features/auth/avatar.ts`       | Random blobatar SVG per registration, written to R2 (ADR 0021).                                                            |
-| Contract  | `packages/api/src/features/auth/middleware.ts`  | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                                                                |
-| Shared    | `packages/api/src/features/auth/credentials.ts` | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up schemas).                                                              |
-| Client    | `apps/web/src/lib/auth-client.ts`               | `createAuthClient` from `better-auth/react`.                                                                               |
-| UI        | `apps/web/src/components/auth-form.tsx`         | One form, both modes. Routes `/signin`, `/signup`.                                                                         |
+| Layer       | File                                                  | Responsibility                                                                                          |
+| ----------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Contract    | `packages/api/src/features/auth/yielded.ts`           | `XsblxAuthApi`: register, passwordSignIn, getSession, requireSession, renewSession, signOut. Claims.   |
+| Middleware  | `packages/api/src/features/auth/middleware.ts`        | `Authentication` middleware, `CurrentUser`, `Unauthorized`.                                             |
+| Shared      | `packages/api/src/features/auth/credentials.ts`       | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up form schemas).                                      |
+| Service     | `apps/server/src/features/auth/yielded-auth.ts`       | `AppAuth` — `Auth.make` with the password strategy and stateful sessions.                               |
+| Assembly    | `apps/server/src/features/auth/yielded-live.ts`       | `AuthLive` — ports, hashing, keys, WebCrypto, fail-closed delivery.                                     |
+| Ports       | `apps/server/src/features/auth/yielded-*-ports.ts`    | Password, session and proof persistence as sequential D1 statements; the D1 attempt limiter.            |
+| Tables      | `apps/server/src/features/auth/yielded-tables.ts`     | yielded's managed tables plus `xsblx_auth_password_attempt_charges`, re-exported through `db/schema.ts`. |
+| Subject     | `apps/server/src/features/auth/schema.ts`             | `user`: `id`, `displayName`, `status`, `securityRevision`.                                              |
+| Hashing     | `apps/server/src/features/auth/yielded-hashing.ts`    | Argon2id on `@yielded/crypto/Portable`, one shared KDF admission.                                       |
+| Keys        | `apps/server/src/features/auth/yielded-keys.ts`       | `AUTH_PROOF_KEY`, `AUTH_BINDING_KEY` through `Config`.                                                  |
+| Mount       | `apps/server/src/features/auth/yielded-http.ts`       | `Http.make` — `/api/auth/*` routes and the request middleware the app `Api` runs under.                 |
+| Client      | `apps/web/src/lib/api-client.ts`, `lib/session.ts`    | `Client.make` on the shared runtime; the `["session"]` query.                                           |
+| UI          | `apps/web/src/components/auth-form.tsx`               | One form, both modes. Sign-up registers, then signs in. Routes `/signin`, `/signup`.                    |
 
-### Regenerating the auth tables
-
-The `auth` CLI runs under node/jiti and cannot import the app's driver, so point
-it at a throwaway config using
-`drizzleAdapter({} as never, { provider: "sqlite" })`, generate to a scratch file,
-then hand-merge the table definitions into `src/features/auth/schema.ts` as
-`sqliteTable`s — booleans are `integer({ mode: "boolean" })`, instants are
-`integer({ mode: "timestamp_ms" })`. Drop the generated `relations(...)` block —
-drizzle 1.0-rc moved that API, and relations live in `src/db/relations.ts` via
-`defineRelations`.
-
-```
-bunx auth@1.7.5 generate --config src/auth.gen.ts --output /tmp/auth-schema.ts -y
-# merge tables into src/features/auth/schema.ts, then:
-bun run deploy   # Drizzle.Schema generates the migration, D1 applies it
-```
+yielded's own SQL kernels need interactive transactions and live queries at
+layer build; D1 has neither, so the ports implement yielded's persistence
+contracts directly. The wire format is an envelope: requests are
+`{"payload": …}`, responses `{"_tag": "Success", "value": …}` or
+`{"_tag": "Failure", "error": …}`. Mutations carry `x-effect-auth-csrf: 1`.
 
 ## Object storage
 
@@ -175,7 +169,7 @@ its own.
 
 | Prefix          | Read path                         | Holds                                     |
 | --------------- | --------------------------------- | ----------------------------------------- |
-| `public/*`      | `GET /public/*` on the API Worker | `public/avatars/<id>.svg` — user avatars  |
+| `public/*`      | `GET /public/*` on the API Worker | nothing yet                               |
 | everything else | none                              | nothing yet; `private/*` is where it goes |
 
 The bucket is private: R2 serves anonymous reads only through a custom domain and
@@ -185,11 +179,8 @@ pattern is the access rule — the ACL SeaweedFS used to enforce — and respons
 carry `cache-control: public, max-age=31536000, immutable` so the edge absorbs
 repeat reads.
 
-Writes happen in Better Auth's `databaseHooks.user.create.before`, outside the
-Effect runtime (ADR 0007), through the binding's `raw` escape hatch — the native
-`R2Bucket` promise API, no S3 client and no credentials. The stored URL is
-absolute, built from `Cloudflare.Worker.URL`, because the web app is a different
-origin.
+Nothing writes to the bucket since avatars went with Better Auth (ADR 0030);
+the binding and the read path stay for the next asset.
 
 ## Observability
 
@@ -293,13 +284,16 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **There are no interactive transactions.** D1 takes one statement or a batch per
   round-trip; a Worker cannot hold `BEGIN` open across awaits. Nothing needs one
   today (ADR 0020).
-- **An avatar read costs a Worker invocation.** The bucket is private, so
+- **An asset read costs a Worker invocation.** The bucket is private, so
   `GET /public/*` runs the isolate and a subrequest on every cache miss (ADR
-  0021). A custom domain would remove the hop and rewrite every stored URL.
-- **Avatars are never deleted.** Deleting a user leaves its object in R2 — 880
-  bytes per orphan, no lifecycle rule and no sweeper (ADR 0021).
-- **An avatar URL is absolute and embeds the API Worker's origin.** Moving the
-  read path rewrites every stored URL (ADR 0021).
+  0021).
+- **A password sign-in or registration costs ~2–3s on a Worker.** Argon2id runs
+  in JavaScript (`@yielded/crypto/Portable`) on the request thread; a wrong
+  password and an unknown address pay the same to keep timing flat (ADR 0030).
+- **Password attempt limits are not atomic.** The D1 limiter counts then
+  inserts, so N concurrent attempts can overshoot a budget by up to N−1.
+- **A `workers.dev` stage cannot hold a browser session.** The cookie is
+  `SameSite=Lax`, and two `workers.dev` hostnames are different sites (ADR 0030).
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset
   paginated (ADR 0016), so a client follows `nextCursor` and there is no page
   number and no count. Adding either costs a `COUNT(*)` per request.
@@ -329,14 +323,9 @@ files at pre-commit; hooks install via the root `prepare` script.
   alive (ADR 0025).
 - **Debug logging in a deployed stage is a code change.** Effect's default
   minimum level applies and there is no `LOG_LEVEL` binding (ADR 0025).
-- **Throughput is unmeasured on this branch.** `main`'s numbers — 12k req/s at
-  `WORKERS=4`, bounded by Better Auth's per-request CPU rather than by the
-  database — described a Bun process on one box and say nothing about an isolate
-  per request. The mechanism they identified still applies: authenticated routes
-  pay cookie verification outside the Effect runtime (ADR 0007), and it is
-  charged per request regardless of what the endpoint does. Re-measure before
-  quoting a number, and remember the session cookie cache has a 60s `maxAge` — a
-  stale bench cookie measures the uncached path.
+- **Throughput is unmeasured.** Every authenticated route verifies the session
+  against D1 (a session read plus a password-revision read) before the handler
+  runs. Re-measure before quoting a number.
 - **No per-request cache in `apps/web`.** `QueryClient` is module-scope and
   query-backed routes are `ssr: false` (ADR 0010). Server-rendering an
   authenticated route would need a per-request client.

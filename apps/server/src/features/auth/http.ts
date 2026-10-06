@@ -6,7 +6,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
  * `public/*` is the read path for generated assets (ADR 0021). R2 only serves
  * objects anonymously through a custom domain, and this stack owns no zone, so
  * the Worker streams them instead — the object key is the URL path, which is what
- * keeps a stored avatar URL a plain string.
+ * keeps a stored asset URL a plain string.
  *
  * The key is matched against an allow-list pattern before it reaches R2: R2's
  * namespace is flat, so `..` cannot escape a prefix, but a request that does not

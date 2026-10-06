@@ -11,6 +11,19 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **yielded-auth replaces Better Auth, end to end** (ADR 0030, superseding ADR
+  0007 and ADR 0022). The web signs in, signs up and signs out through
+  yielded's client, built from the shared contract in `packages/api` and run on
+  the same runtime as the `Api` client; the session is a TanStack query.
+  Sign-up registers, then signs in. The custom `POST /api/auth/sign-out` route
+  is gone in favour of the contract's `signOut`. The auth routes now admit the
+  HTTPS origins in `CORS_ALLOWED_ORIGINS`, and CORS allows the
+  `x-effect-auth-csrf` header. `better-auth`, `@better-auth/drizzle-adapter`,
+  `@alchemy.run/better-auth`, `blobatar`, avatars, `AUTH_SECRET`,
+  `SESSION_COOKIE_SAMESITE` and the vendored `repos/better-auth` are removed.
+  The session cookie is always `SameSite=Lax`, so a stage whose website signs
+  users in needs `WEB_DOMAIN`/`API_DOMAIN` under one registrable domain.
+
 - **yielded-auth spike moves to `0.1.0-beta.23`, the zero-dependency core.**
   `@yielded/auth-crypto` is replaced by `@yielded/crypto`: password Argon2id
   runs on its `Portable` backend, and Effect `Crypto`/`Hmac` come from its

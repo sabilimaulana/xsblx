@@ -2,6 +2,7 @@
 status: accepted
 version: 1.0.0
 updated: 2026-08-20
+amended-by: ./0030-yielded-auth-replaces-better-auth.md
 ---
 
 # 0024 — Custom domains per stage, and a first-party session cookie

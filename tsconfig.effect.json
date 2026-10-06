@@ -127,26 +127,12 @@
             }
           },
           {
-            // Better Auth is a plain library: it boots outside the Effect
-            // runtime and its drizzle schema is CLI-generated.
-            "include": ["**/auth.ts", "**/features/auth/schema.ts", "**/lib/auth-client.ts"],
+            // The drizzle schema's `$defaultFn` timestamps are plain JS that
+            // drizzle runs at insert time, outside any Effect.
+            "include": ["**/features/auth/schema.ts"],
             "options": {
               "diagnosticSeverity": {
-                "processEnv": "off",
-                "globalDate": "off",
-                "asyncFunction": "off",
-                "newPromise": "off"
-              }
-            }
-          },
-          {
-            // Avatar generation is part of auth: it runs inside a Better Auth
-            // database hook, outside the Effect runtime, against the native R2
-            // binding's promise API.
-            "include": ["**/features/auth/avatar.ts"],
-            "options": {
-              "diagnosticSeverity": {
-                "asyncFunction": "off"
+                "globalDate": "off"
               }
             }
           },

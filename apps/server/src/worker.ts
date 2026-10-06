@@ -15,7 +15,6 @@ import { assetRoutes } from "./features/auth/http.ts";
 import { AuthenticationLive } from "./features/auth/middleware.ts";
 import { makeYieldedHttp } from "./features/auth/yielded-http.ts";
 import { AuthLive } from "./features/auth/yielded-live.ts";
-import { signOutRoutes } from "./features/auth/yielded-signout.ts";
 import { HealthHandlers } from "./features/health/http.ts";
 import { TodosApiHandlers } from "./features/todos/http.ts";
 
@@ -45,7 +44,7 @@ const HttpPlatformStub = Layer.succeed(HttpPlatform.HttpPlatform)({
  * router into the `fetch` handler Cloudflare invokes.
  *
  * Public on purpose (ADR 0008): the browser calls this Worker directly with the
- * Better Auth session cookie, which is what makes the CORS allow-list and
+ * yielded session cookie, which is what makes the CORS allow-list and
  * `credentials: true` load-bearing rather than decorative.
  */
 export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
@@ -97,7 +96,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // never has (it runs at plan time and per isolate start). The old Better
     // Auth setup deferred those reads per request behind `Effect.cached`;
     // yielded needs the origin string at build, so the stage declares it.
-    // Reading it here also binds it as Worker env (like `AUTH_SECRET`).
+    // Reading it here also binds it as Worker env.
     const origin = yield* Config.String("API_PUBLIC_ORIGIN");
 
     // Yielded owns the whole auth surface. `routes()` is its operation API
@@ -109,7 +108,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // provides `AuthRequest` per request (kind "request" performs no origin
     // or CSRF rejection — it only makes the credentials available), which
     // `Authentication` declares in `requires`.
-    const yielded = makeYieldedHttp(origin);
+    const yielded = makeYieldedHttp({ origin, allowedOrigins: cors.allowedOrigins });
     const apiRoutes = HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
       Layer.provide([HealthHandlers, TodosApiHandlers.pipe(Layer.provide(AuthenticationLive))]),
       // The request middleware validates its static configuration (origin
@@ -122,14 +121,10 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // mismatch, contract drift) is a wiring defect in this file, not an
     // operator error, so it dies instead of widening the Worker's channel.
     const yieldedHttp = Layer.orDie(yielded.routes());
-    // Native sign-out runs under the same request middleware: `signOut`
-    // reads the validated request credential, so it needs `AuthRequest`
-    // exactly like the contract actions do.
-    const signOutHttp = Layer.orDie(yielded.middleware(signOutRoutes));
 
     return {
       fetch: yield* HttpRouter.toHttpEffect(
-        Layer.mergeAll(apiRoutes, yieldedHttp, signOutHttp, assetRoutes(assets)).pipe(
+        Layer.mergeAll(apiRoutes, yieldedHttp, assetRoutes(assets)).pipe(
           // The session middleware takes the yielded `AppAuth` tag rather
           // than an instance, so it stays substitutable. Each `provide`
           // feeds one layer's outputs downward while that layer's own
@@ -160,8 +155,10 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
               // `traceparent` and `b3` are sent by Effect's `HttpClient` to
               // propagate the trace across the call; without them the browser
               // fails the preflight.
-              allowedHeaders: ["content-type", "traceparent", "b3"],
-              // Better Auth authenticates with a session cookie, so the browser
+              // `x-effect-auth-csrf` is the header yielded's client sends on
+              // every auth mutation; without it the preflight fails silently.
+              allowedHeaders: ["content-type", "traceparent", "b3", "x-effect-auth-csrf"],
+              // yielded authenticates with a session cookie, so the browser
               // only sends it — and only accepts the response — when credentials
               // are allowed.
               credentials: true,
@@ -176,7 +173,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // `Tracer` over `tracing.startActiveSpan`, so `Effect.fn("Todos.list")`
     // frames nest inside Cloudflare's own fetch and D1 spans. There is still no
     // exporter, no OTLP endpoint and no flush — Cloudflare owns sampling and
-    // submission — and the only credential this Worker carries is `AUTH_SECRET`.
+    // submission — and the only credentials this Worker carries are the two auth keys.
     Effect.provide([
       Cloudflare.D1.QueryDatabaseBinding,
       Cloudflare.R2.ReadWriteBucketBinding,

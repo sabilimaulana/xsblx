@@ -1,7 +1,7 @@
 import { DateTime, Option } from "effect";
 
 /**
- * Spike (yielded-auth): shared helpers for the hand-written D1 ports.
+ * Shared helpers for the hand-written D1 ports.
  *
  * Session `record` blobs round-trip yielded values (claims, provenance)
  * through JSON. DateTimes use the shared `$yieldedDateTime` millis codec —
