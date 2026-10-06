@@ -290,6 +290,9 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **A password sign-in or registration costs ~2–3s on a Worker.** Argon2id runs
   in JavaScript (`@yielded/crypto/Portable`) on the request thread; a wrong
   password and an unknown address pay the same to keep timing flat (ADR 0030).
+  One isolate derives one at a time and queues 8 more for up to 20s, so it
+  serves ~0.4 sign-ins a second; the tenth concurrent one on an isolate fails
+  as `PasswordUnavailable`.
 - **There is no deployment-wide sign-in limit.** The D1 attempt limiter
   charges per email and per subject only; yielded's single `sign-in` action
   bucket is not charged, because anyone could exhaust it and lock every user

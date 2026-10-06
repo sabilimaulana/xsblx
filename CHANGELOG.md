@@ -18,6 +18,10 @@ in an ADR, not here — link it.
 
 ### Fixed
 
+- **Concurrent password sign-ins queue instead of failing.** Argon2 admission
+  queues up to 8 derivations for up to 20s per isolate; before, the third
+  concurrent sign-in failed after 5s.
+
 - **One client can no longer lock every user out of sign-in.** The D1 attempt
   limiter no longer charges yielded's deployment-wide `sign-in` bucket; the
   per-email and per-subject budgets still apply.

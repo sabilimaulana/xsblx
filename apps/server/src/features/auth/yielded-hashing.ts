@@ -26,10 +26,15 @@ export const ScreeningLive = Layer.succeed(
  * One `PasswordKdfAdmission` instance feeds both the hasher and the KDF
  * backend, so a single permit bounds every derivation in the isolate. Effect
  * `Crypto` comes from the auth assembly (`yielded-live.ts`).
+ *
+ * A derivation holds the permit ~2.5s, so the queue is sized to what one
+ * permit drains inside the wait: 8 queued × 2.5s ≈ 20s. The default (16
+ * queued, 5s) turned the third concurrent sign-in into `PasswordUnavailable`
+ * while it still had a turn coming. Waiting costs wall time, not CPU time.
  */
 export const HashingLive = Password.PasswordHashing.layer().pipe(
   Layer.provide(Portable.layer(globalThis.crypto.subtle)),
-  Layer.provide(Password.PasswordKdfAdmission.layer()),
+  Layer.provide(Password.PasswordKdfAdmission.layer({ maxQueued: 8, maxWaitMilliseconds: 20_000 })),
 );
 
 export const PasswordPolicyLive = Password.NewPasswordCheck.layer({
