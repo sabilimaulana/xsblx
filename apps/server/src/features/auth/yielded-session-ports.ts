@@ -4,17 +4,17 @@ import { Schema as AuthSchema } from "@yielded/auth";
 import { coordinateCommit, LifecycleHooks } from "@yielded/auth/Hooks";
 import { AuthenticationAssurance } from "@yielded/auth/Operations";
 import { hooksLayer } from "@yielded/auth/Persistence";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
-import { Context, DateTime, Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 
 import { Db } from "../../db/index.ts";
 import { newId } from "../../id.ts";
 import { AppAuth } from "./yielded-auth.ts";
 import { user } from "./schema.ts";
-import { dateTimeFromMillis, fromJson, nowMillis, toJson } from "./yielded-support.ts";
+import { atomically, dateTimeFromMillis, fromJson, nowMillis, toJson } from "./yielded-support.ts";
 import { passwords, sessionFlows, sessions } from "./yielded-tables.ts";
 import { signInRequirement } from "./yielded-storage.ts";
 
@@ -24,7 +24,8 @@ import { signInRequirement } from "./yielded-storage.ts";
  * Same story as the password ports (see `yielded-password-ports.ts`): the
  * composed layer's interactive kernels cannot run on D1, so
  * `AuthenticationAuthority`, `StatefulSessionPersistence`, and
- * `SessionRepository` are implemented here as sequential D1 statements with
+ * `SessionRepository` are implemented here as D1 statements (`establish` is
+ * one atomic `batch`, `rotate` a guarded compare-and-swap) with
  * per-request I/O and pure layer build. Logic mirrors upstream's
  * custom-store example.
  *
@@ -319,19 +320,23 @@ export const SessionPortsLive = Layer.effectContext(
             ) {
               return yield* Sessions.StaleAuthentication.make({});
             }
-            const flowRows = (yield* live(
-              db
-                .select({ dedupUntil: col(sessionFlows, "dedup_until") })
-                .from(sessionFlows)
-                .where(eq(col(sessionFlows, "flow_id"), String(input.evidence.flowId))),
-            )) as Array<{ readonly dedupUntil: number }>;
-            const digestRows = (yield* live(
-              db
-                .select({ sessionId: col(sessions, "session_id") })
-                .from(sessions)
-                .where(eq(col(sessions, "digest"), String(input.session.digest))),
-            )) as Array<{ readonly sessionId: string }>;
-            if (flowRows.some((row) => row.dedupUntil > now) || digestRows.length > 0) {
+            const flowId = String(input.evidence.flowId);
+            const conflicted = Effect.gen(function* () {
+              const flowRows = (yield* live(
+                db
+                  .select({ dedupUntil: col(sessionFlows, "dedup_until") })
+                  .from(sessionFlows)
+                  .where(eq(col(sessionFlows, "flow_id"), flowId)),
+              )) as Array<{ readonly dedupUntil: number }>;
+              const digestRows = (yield* live(
+                db
+                  .select({ sessionId: col(sessions, "session_id") })
+                  .from(sessions)
+                  .where(eq(col(sessions, "digest"), String(input.session.digest))),
+              )) as Array<{ readonly sessionId: string }>;
+              return flowRows.some((row) => row.dedupUntil > now) || digestRows.length > 0;
+            });
+            if (yield* conflicted) {
               return yield* Sessions.SessionConflict.make({});
             }
             const sessionId = Sessions.SessionId.make(newId());
@@ -341,8 +346,25 @@ export const SessionPortsLive = Layer.effectContext(
               sessionId,
               version,
             };
-            const receipt = prepare(record, journal);
-            yield* live(
+            // Flow and session commit together: a duplicate flowId (unique
+            // key) rolls the session back with it instead of orphaning it. An
+            // expired flow row is replaced, since its flowId may be reused.
+            const written = yield* atomically(db)([
+              db
+                .delete(sessionFlows)
+                .where(
+                  and(
+                    eq(col(sessionFlows, "flow_id"), flowId),
+                    lte(col(sessionFlows, "dedup_until"), now),
+                  ),
+                ),
+              db.insert(sessionFlows).values({
+                flowId,
+                subjectId: String(input.session.subjectId),
+                state: "seen",
+                pendingDigest: null,
+                dedupUntil: DateTime.toEpochMillis(input.session.absoluteExpiresAt),
+              }),
               db.insert(sessions).values({
                 sessionId,
                 subjectId: String(input.session.subjectId),
@@ -354,17 +376,14 @@ export const SessionPortsLive = Layer.effectContext(
                 absoluteExpiresAt: DateTime.toEpochMillis(input.session.absoluteExpiresAt),
                 record: toJson(record),
               }),
-            );
-            yield* live(
-              db.insert(sessionFlows).values({
-                flowId: String(input.evidence.flowId),
-                subjectId: String(input.session.subjectId),
-                state: "seen",
-                pendingDigest: null,
-                dedupUntil: DateTime.toEpochMillis(input.session.absoluteExpiresAt),
-              }),
-            );
-            return receipt;
+            ]).pipe(Effect.option);
+            if (Option.isNone(written)) {
+              // Lost a race for the flowId or digest; anything else is an outage.
+              return yield* (yield* conflicted)
+                ? Sessions.SessionConflict.make({})
+                : Sessions.SessionUnavailable.make({});
+            }
+            return prepare(record, journal);
           }),
         ),
       verify: (input) =>
@@ -458,8 +477,9 @@ export const SessionPortsLive = Layer.effectContext(
               provenance: parsed.provenance,
               credentialVersion: input.nextCredentialVersion,
             };
-            const receipt = prepare(next, journal);
-            yield* live(
+            // Compare-and-swap on the digest and version just checked: of two
+            // concurrent rotations of one session, exactly one matches.
+            const rotated = yield* live(
               db
                 .update(sessions)
                 .set({
@@ -469,9 +489,20 @@ export const SessionPortsLive = Layer.effectContext(
                   version,
                   record: toJson(next),
                 })
-                .where(eq(col(sessions, "session_id"), row.sessionId)),
+                .where(
+                  and(
+                    eq(col(sessions, "session_id"), row.sessionId),
+                    eq(col(sessions, "digest"), String(input.expectedDigest)),
+                    eq(col(sessions, "version"), String(input.expectedVersion)),
+                    eq(col(sessions, "security_revision"), String(input.expectedSecurityRevision)),
+                  ),
+                )
+                .returning({ sessionId: col(sessions, "session_id") }),
             );
-            return receipt;
+            if (rotated.length === 0) {
+              return yield* Sessions.SessionConflict.make({});
+            }
+            return prepare(next, journal);
           }),
         ),
       revokeDigest: (digest, prepare) =>

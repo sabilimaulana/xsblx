@@ -1,11 +1,10 @@
-import { Claims, Registration } from "@xsblx/api/auth/yielded";
+import { Claims } from "@xsblx/api/auth/yielded";
 import { Password, Sessions } from "@yielded/auth";
 import { Schema as AuthSchema } from "@yielded/auth";
 import { eq } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 
 import { Db } from "../../db/index.ts";
-import { newId } from "../../id.ts";
 import { AppAuth } from "./yielded-auth.ts";
 import { user } from "./schema.ts";
 import { BoundPersistence } from "./yielded-persistence.ts";
@@ -16,8 +15,9 @@ import { BoundPersistence } from "./yielded-persistence.ts";
  * The `user` row is the subject: `id` is the subject id, `displayName` the
  * profile name, `status` gates sign-in (`"active"` admits),
  * `securityRevision` binds password-bound sessions. The login email lives
- * only in yielded's identifiers table — provisioning writes it there, and
- * claims resolve it from there. No dual-write anywhere.
+ * only in yielded's identifiers table — registration (the password ports)
+ * writes it there in the same batch as the `user` row, and claims resolve it
+ * from there. No dual-write anywhere.
  */
 
 export const signInRequirement = Sessions.AuthenticationRequirement.make({
@@ -48,40 +48,12 @@ export const storage = BoundPersistence.managed({
 /** Managed auth tables join the app schema so alchemy migrates them. */
 export const authSchema = storage.schema;
 
-const ProvisioningLive = Layer.effect(
-  BoundPersistence.Provisioning,
-  Effect.gen(function* () {
-    const db = yield* Db;
-    return {
-      password: Effect.fn("YieldedProvisioning.create")(
-        function* ({
-          registration,
-        }: {
-          readonly identifier: { readonly value: string };
-          readonly registration: typeof Registration.Type;
-        }) {
-          const id = newId();
-          const revision = newId();
-          yield* db.insert(user).values({
-            id,
-            displayName: registration.displayName,
-            status: "active",
-            securityRevision: revision,
-          });
-          return yield* Schema.decodeEffect(AuthSchema.SubjectId)(id);
-        },
-        Effect.mapError(() => Password.PasswordUnavailable.make({})),
-      ),
-    };
-  }),
-);
-
-const ClaimsLive = Layer.effect(
+export const ClaimsLive = Layer.effect(
   AppAuth.strategies.password.SessionClaims,
   Effect.gen(function* () {
     const db = yield* Db;
     return {
-      resolve: Effect.fn("YieldedProvisioning.claims")(
+      resolve: Effect.fn("YieldedClaims.resolve")(
         function* ({
           subjectId,
           credential,
@@ -104,5 +76,3 @@ const ClaimsLive = Layer.effect(
     };
   }),
 );
-
-export const AuthProvisioningLive = Layer.mergeAll(ProvisioningLive, ClaimsLive);

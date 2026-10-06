@@ -9,6 +9,18 @@ in an ADR, not here — link it.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `user` rebuild migration no longer empties `todos`.**
+  `20261004053311_cute_lady_bullseye` drops and recreates `user`, which on D1
+  cascaded into every todo; it now copies `todos` aside and restores them.
+- **yielded-auth D1 ports commit atomically where the contract requires it.**
+  The password attempt limiter charges in one conditional insert, so
+  concurrent attempts cannot exceed the budget. Registration and session
+  establishment each write in one D1 batch. Session rotation is a
+  compare-and-swap on digest and version. Registration writes the `user` row
+  itself; the unused provisioning layer is removed.
+
 ### Changed
 
 - **yielded-auth replaces Better Auth, end to end** (ADR 0030, superseding ADR

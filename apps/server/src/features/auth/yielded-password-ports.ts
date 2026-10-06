@@ -2,7 +2,7 @@ import { Password, Sessions } from "@yielded/auth";
 import { Schema as AuthSchema } from "@yielded/auth";
 import { coordinateCommit, LifecycleHooks } from "@yielded/auth/Hooks";
 import { hooksLayer } from "@yielded/auth/Persistence";
-import { and, count, eq, lt } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
@@ -12,9 +12,8 @@ import { Db } from "../../db/index.ts";
 import { newId } from "../../id.ts";
 import { AppAuth } from "./yielded-auth.ts";
 import { user } from "./schema.ts";
-import { BoundPersistence } from "./yielded-persistence.ts";
 import { consumeProofCompletion, proofCompletionCurrent } from "./yielded-proof-ports.ts";
-import { nowMillis } from "./yielded-support.ts";
+import { atomically, nowMillis } from "./yielded-support.ts";
 import {
   credentials,
   identifiers,
@@ -33,7 +32,8 @@ import {
  * die on Workers (no D1 at init, no interactive transactions on D1), which is
  * what the `PersistenceConfigurationError` at isolate boot proved. These
  * ports implement the same `PasswordPersistence` + `RegistrationAuthority`
- * contracts as sequential D1 statements through the `Db` handle: reads and
+ * contracts as D1 statements through the `Db` handle (registration is one
+ * atomic `batch`, the limiter one conditional insert): reads and
  * writes happen per request inside the port methods, layer build stays pure,
  * and each mutating method runs inside `coordinateCommit` so the kernel's
  * `prepare` receives a real journal.
@@ -75,10 +75,10 @@ const live = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, Password.Pass
 
 /**
  * Rolling-window attempt budget per (module, action, scope, key), shared by
- * every isolate through D1. Expired rows for the key are pruned on each check.
- * ponytail: count-then-insert is not atomic, so N concurrent attempts can
- * overshoot a budget by up to N-1; move to a Durable Object counter if that
- * matters.
+ * every isolate through D1. The charge is one conditional insert — count and
+ * write in a single statement, which D1 serializes — so concurrent attempts
+ * cannot all read a count under the limit and all get through. Expired rows
+ * for the key are pruned on each check.
  */
 const AttemptLimiterLive = Layer.effect(
   Password.PasswordAttemptLimiter,
@@ -88,29 +88,35 @@ const AttemptLimiterLive = Layer.effect(
     return Password.PasswordAttemptLimiter.of({
       check: Effect.fn("YieldedD1.attemptLimit")(function* (input) {
         const now = nowMillis();
-        const bucket = and(
-          eq(c.moduleId, input.moduleId),
-          eq(c.action, input.action),
-          eq(c.scope, input.scope),
-          eq(c.key, input.key),
-        );
+        const since = now - input.budget.windowMillis;
         yield* live(
-          db.delete(c).where(and(bucket, lt(c.occurredAt, now - input.budget.windowMillis))),
+          db
+            .delete(c)
+            .where(
+              and(
+                eq(c.moduleId, input.moduleId),
+                eq(c.action, input.action),
+                eq(c.scope, input.scope),
+                eq(c.key, input.key),
+                lt(c.occurredAt, since),
+              ),
+            ),
         );
-        const [used] = yield* live(db.select({ n: count() }).from(c).where(bucket));
-        if ((used?.n ?? 0) >= input.budget.limit) {
+        const charged = yield* live(
+          db.all<{ readonly id: string }>(sql`
+            insert into ${c} ("id", "module_id", "action", "scope", "key", "occurred_at")
+            select ${newId()}, ${input.moduleId}, ${input.action}, ${input.scope}, ${input.key}, ${now}
+            where (
+              select count(*) from ${c}
+              where ${c.moduleId} = ${input.moduleId} and ${c.action} = ${input.action}
+                and ${c.scope} = ${input.scope} and ${c.key} = ${input.key}
+                and ${c.occurredAt} >= ${since}
+            ) < ${input.budget.limit}
+            returning "id"`),
+        );
+        if (charged.length === 0) {
           return yield* Password.PasswordRejected.make({});
         }
-        yield* live(
-          db.insert(c).values({
-            id: newId(),
-            moduleId: input.moduleId,
-            action: input.action,
-            scope: input.scope,
-            key: input.key,
-            occurredAt: now,
-          }),
-        );
       }),
     });
   }),
@@ -316,7 +322,6 @@ export const PasswordPortsLive = Layer.effectContext(
   Effect.gen(function* () {
     const db = yield* Db;
     const hooks = yield* LifecycleHooks;
-    const provisioning = yield* BoundPersistence.Provisioning;
 
     const withCommit = <A, E, R>(
       owner: (
@@ -674,52 +679,51 @@ export const PasswordPortsLive = Layer.effectContext(
               }
               // A public request ID never adopts an old subject or replaces
               // its password: replay and duplicate both suppress.
-              const replays = (yield* live(
-                db
-                  .select({ requestId: col(passwordRegistrations, "request_id") })
-                  .from(passwordRegistrations)
-                  .where(
-                    and(
-                      eq(col(passwordRegistrations, "module_id"), moduleId),
-                      eq(col(passwordRegistrations, "request_id"), input.requestId),
+              const taken = Effect.gen(function* () {
+                const replays = (yield* live(
+                  db
+                    .select({ requestId: col(passwordRegistrations, "request_id") })
+                    .from(passwordRegistrations)
+                    .where(
+                      and(
+                        eq(col(passwordRegistrations, "module_id"), moduleId),
+                        eq(col(passwordRegistrations, "request_id"), input.requestId),
+                      ),
                     ),
-                  ),
-              )) as Array<{ readonly requestId: string }>;
-              const existing = yield* subjectForEmail(db, input.identifier.value);
-              if (replays.length > 0 || (existing !== undefined && existing.status === "active")) {
+                )) as Array<{ readonly requestId: string }>;
+                const existing = yield* subjectForEmail(db, input.identifier.value);
+                return replays.length > 0 || existing?.status === "active";
+              });
+              if (yield* taken) {
                 return prepare({ _tag: "Suppressed" }, journal);
               }
-              const email = yield* live(
-                Schema.decodeEffect(AuthSchema.Email)(input.identifier.value),
-              );
-              const subjectId = yield* provisioning.password({
-                identifier: input.identifier,
-                registration: input.registration,
-              });
-              void email;
+              const subjectId = yield* live(Schema.decodeEffect(AuthSchema.SubjectId)(newId()));
               const credentialId = credentialIdFor(subjectId);
               const credentialRevision = newId();
-              const identifierRevision = newId();
-              const receipt = prepare({ _tag: "Created", subjectId }, journal);
-              yield* live(
+              // Subject, identifier, credential, password and request id commit
+              // together or not at all: a half-written registration would bind
+              // the email to a subject with no password, locking it out for good.
+              const written = yield* atomically(db)([
+                db.insert(user).values({
+                  id: subjectId,
+                  displayName: input.registration.displayName,
+                  status: "active",
+                  securityRevision: newId(),
+                }),
                 db.insert(identifiers).values({
                   namespace: "email",
                   value: input.identifier.value,
                   subjectId,
-                  revision: identifierRevision,
+                  revision: newId(),
                   verifiedAt: null,
                   active: 1,
                 }),
-              );
-              yield* live(
                 db.insert(credentials).values({
                   credentialId,
                   subjectId,
                   revision: credentialRevision,
                   active: 1,
                 }),
-              );
-              yield* live(
                 db.insert(passwords).values({
                   moduleId,
                   subjectId,
@@ -729,11 +733,18 @@ export const PasswordPortsLive = Layer.effectContext(
                   verifier: Redacted.value(input.replacement.verifier),
                   normalization: input.replacement.normalization,
                 }),
-              );
-              yield* live(
                 db.insert(passwordRegistrations).values({ moduleId, requestId: input.requestId }),
-              );
-              return receipt;
+              ]).pipe(Effect.option);
+              if (Option.isNone(written)) {
+                // A concurrent registration claimed the email or request id
+                // first (unique key); the batch rolled back. Same answer as a
+                // replay. Anything else is a real outage.
+                if (!(yield* taken)) {
+                  return yield* Password.PasswordUnavailable.make({});
+                }
+                return prepare({ _tag: "Suppressed" }, journal);
+              }
+              return prepare({ _tag: "Created", subjectId }, journal);
             }),
           ),
       }),

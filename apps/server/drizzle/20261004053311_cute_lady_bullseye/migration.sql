@@ -1,5 +1,5 @@
 ALTER TABLE `user` RENAME COLUMN `name` TO `display_name`;--> statement-breakpoint
-PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__todos_keep` AS SELECT * FROM `todos`;--> statement-breakpoint
 CREATE TABLE `__new_user` (
 	`id` text PRIMARY KEY,
 	`display_name` text NOT NULL,
@@ -12,4 +12,5 @@ CREATE TABLE `__new_user` (
 INSERT INTO `__new_user`(`id`, `display_name`, `status`, `security_revision`, `created_at`, `updated_at`) SELECT `id`, `display_name`, `status`, `security_revision`, `created_at`, `updated_at` FROM `user`;--> statement-breakpoint
 DROP TABLE `user`;--> statement-breakpoint
 ALTER TABLE `__new_user` RENAME TO `user`;--> statement-breakpoint
-PRAGMA foreign_keys=ON;
+INSERT INTO `todos` SELECT * FROM `__todos_keep`;--> statement-breakpoint
+DROP TABLE `__todos_keep`;

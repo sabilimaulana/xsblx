@@ -154,6 +154,16 @@ no OTLP endpoint.
   `migrate.ts` back. The one exception: when the deploy fails with "drizzle-kit
   needs a decision" (rename vs create), run its printed `drizzle-kit generate`
   once with the `--hints` it lists, read the SQL, and commit the migration.
+- **Read every generated migration for a table rebuild.** To drop a `UNIQUE`
+  column drizzle-kit emits `PRAGMA foreign_keys=OFF` + `DROP TABLE`. D1 runs a
+  migration as one batch, where that pragma is a no-op, so the drop cascades
+  and empties every child table with `ON DELETE CASCADE`. Copy the children
+  aside and restore them in the same migration
+  (`20261004053311_cute_lady_bullseye` is the pattern).
+- **A multi-row write that must commit together goes through `atomically`**
+  (`features/auth/yielded-support.ts`), one D1 `batch`. A check-then-write
+  across statements is a race; make it one conditional statement or a guarded
+  `UPDATE … RETURNING`.
 - **Ids are 21-character nanoids over `0-9A-Za-z`** (ADR 0017). Generate them
   with `newId` from `apps/server/src/id.ts` — never `crypto.randomUUID`, never a
   serial column. The shape is `IdString` in `packages/api/src/id.ts`; brand it

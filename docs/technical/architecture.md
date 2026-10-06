@@ -145,7 +145,7 @@ a shared schema; the server and the web client are both built from it.
 | Shared      | `packages/api/src/features/auth/credentials.ts`       | Credential rules (`MIN_PASSWORD_LENGTH`, sign-in/up form schemas).                                      |
 | Service     | `apps/server/src/features/auth/yielded-auth.ts`       | `AppAuth` — `Auth.make` with the password strategy and stateful sessions.                               |
 | Assembly    | `apps/server/src/features/auth/yielded-live.ts`       | `AuthLive` — ports, hashing, keys, WebCrypto, fail-closed delivery.                                     |
-| Ports       | `apps/server/src/features/auth/yielded-*-ports.ts`    | Password, session and proof persistence as sequential D1 statements; the D1 attempt limiter.            |
+| Ports       | `apps/server/src/features/auth/yielded-*-ports.ts`    | Password, session and proof persistence on D1; multi-row writes go through one `batch`. The D1 attempt limiter. |
 | Tables      | `apps/server/src/features/auth/yielded-tables.ts`     | yielded's managed tables plus `xsblx_auth_password_attempt_charges`, re-exported through `db/schema.ts`. |
 | Subject     | `apps/server/src/features/auth/schema.ts`             | `user`: `id`, `displayName`, `status`, `securityRevision`.                                              |
 | Hashing     | `apps/server/src/features/auth/yielded-hashing.ts`    | Argon2id on `@yielded/crypto/Portable`, one shared KDF admission.                                       |
@@ -290,8 +290,6 @@ files at pre-commit; hooks install via the root `prepare` script.
 - **A password sign-in or registration costs ~2–3s on a Worker.** Argon2id runs
   in JavaScript (`@yielded/crypto/Portable`) on the request thread; a wrong
   password and an unknown address pay the same to keep timing flat (ADR 0030).
-- **Password attempt limits are not atomic.** The D1 limiter counts then
-  inserts, so N concurrent attempts can overshoot a budget by up to N−1.
 - **A `workers.dev` stage cannot hold a browser session.** The cookie is
   `SameSite=Lax`, and two `workers.dev` hostnames are different sites (ADR 0030).
 - **List pages cannot be jumped to, and carry no total.** Lists are keyset

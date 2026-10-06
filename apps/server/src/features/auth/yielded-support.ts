@@ -1,5 +1,7 @@
 import { DateTime, Option } from "effect";
 
+import type { Db } from "../../db/index.ts";
+
 /**
  * Shared helpers for the hand-written D1 ports.
  *
@@ -16,6 +18,23 @@ import { DateTime, Option } from "effect";
 
 /** Epoch millis, the only clock the ports use. */
 export const nowMillis = (): number => Date.now();
+
+/**
+ * Run drizzle queries as one D1 batch: every statement commits or none does.
+ * D1 has no interactive transactions, so this is the only atomic multi-write.
+ * Results come back per statement, as raw rows keyed by database column name.
+ */
+export const atomically =
+  (db: Db["Service"]) =>
+  (
+    queries: ReadonlyArray<{ toSQL(): { readonly sql: string; readonly params: Array<unknown> } }>,
+  ) =>
+    db.$client.batch(
+      queries.map((query) => {
+        const { sql, params } = query.toSQL();
+        return db.$client.unsafe<Record<string, unknown>>(sql, params);
+      }),
+    );
 
 const dtMarker = "$yieldedDateTime";
 

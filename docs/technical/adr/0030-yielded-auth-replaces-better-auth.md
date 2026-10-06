@@ -33,7 +33,9 @@ this decision:
 - **yielded's SQL kernels cannot run on Workers.** They build interactive
   transactions and validate storage with live queries at layer build; D1 has
   neither at init. The app implements yielded's persistence contracts itself
-  (`yielded-*-ports.ts`) as sequential D1 statements.
+  (`yielded-*-ports.ts`) on D1. Where a contract needs several rows to commit
+  together, they go in one D1 `batch`, which is atomic; a single-row
+  compare-and-swap is a guarded `UPDATE … RETURNING`.
 - **yielded's session cookie accepts `SameSite` `lax` or `strict` only.** There
   is no `none`.
 

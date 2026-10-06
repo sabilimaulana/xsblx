@@ -7,7 +7,7 @@ import { AppAuth } from "./yielded-auth.ts";
 import { HashingLive, PasswordPolicyLive, ScreeningLive } from "./yielded-hashing.ts";
 import { KeysLive } from "./yielded-keys.ts";
 import { PasswordPortsLive } from "./yielded-password-ports.ts";
-import { AuthProvisioningLive } from "./yielded-storage.ts";
+import { ClaimsLive } from "./yielded-storage.ts";
 import { ProofPortsLive } from "./yielded-proof-ports.ts";
 import { SessionPortsLive } from "./yielded-session-ports.ts";
 
@@ -72,7 +72,7 @@ const SessionClaimsLive = Layer.effect(
  *
  * What still comes from the composed persistence helper: the table
  * *definitions* (`BoundPersistence.managed` in `yielded-storage.ts`, which
- * owns DDL) and the app `Provisioning`/`SessionClaims` implementations.
+ * owns DDL) and the app `SessionClaims` implementation.
  * `BoundPersistence.layer` itself (kernels, validation, `Config`) is no
  * longer part of any assembly.
  */
@@ -122,16 +122,15 @@ const CoreLive = AppAuth.layer.pipe(
   // The explicit D1 ports (pure build, per-request I/O). `provideMerge`
   // feeds a layer's outputs only backward into the accumulated
   // requirements — never forward into layers merged later. So every provider
-  // sits AFTER its consumers: `AuthProvisioningLive` (app provisioning and
-  // session claims) lands after the ports AND the claims wrapper that need
-  // it, not before.
+  // sits AFTER its consumers: `ClaimsLive` lands after the ports AND the
+  // claims wrapper that need it, not before.
   Layer.provideMerge(PasswordPortsLive),
   Layer.provideMerge(SessionPortsLive),
   Layer.provideMerge(ProofPortsLive),
   // Exposed at the top level, not only inside `SessionClaimsLive`'s
   // construction: sign-in resolves claims and screens passwords through the
-  // auth layer directly, and registration provisions through it.
-  Layer.provideMerge(AuthProvisioningLive),
+  // auth layer directly.
+  Layer.provideMerge(ClaimsLive),
   Layer.provideMerge(ScreeningLive),
   Layer.provideMerge(FailClosedDelivery),
   Layer.provideMerge(PasswordMutationsDeny),
