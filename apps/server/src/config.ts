@@ -1,4 +1,34 @@
-import { Config, Option } from "effect";
+import { Config, Effect, Option, Schema } from "effect";
+
+/**
+ * An origin exactly as a browser sends it — scheme, host, optional port; no
+ * path, no trailing slash, no wildcard. CORS and yielded both compare origins
+ * as strings, so `https://app.example.com/` would match nothing, and yielded
+ * would fail the Worker at build. Validating here makes it a `ConfigError` at
+ * deploy instead.
+ */
+const Origin = Schema.String.check(
+  Schema.makeFilter((value) => {
+    const url = URL.parse(value);
+    return (
+      (url !== null &&
+        (url.protocol === "https:" || url.protocol === "http:") &&
+        url.origin === value) ||
+      "must be an origin like https://app.example.com"
+    );
+  }),
+);
+
+const HttpsOrigin = Origin.check(
+  Schema.makeFilter((value) => value.startsWith("https://") || "must be an https origin"),
+);
+
+const decodeConfig =
+  <S extends Schema.Decoder<unknown>>(schema: S) =>
+  (value: S["Encoded"]) =>
+    Schema.decodeEffect(schema)(value).pipe(
+      Effect.mapError((issue) => new Config.ConfigError(issue)),
+    );
 
 /**
  * Browsers block cross-origin mutations without these headers, and the web app is
@@ -15,9 +45,19 @@ import { Config, Option } from "effect";
 export const CorsConfig = Config.all({
   allowedOrigins: Config.NonEmptyString("CORS_ALLOWED_ORIGINS").pipe(
     Config.withDefault("http://localhost:3001"),
-    Config.map((origins) => origins.split(",").map((origin) => origin.trim())),
+    Config.mapEffect((origins) =>
+      decodeConfig(Schema.Array(Origin))(origins.split(",").map((origin) => origin.trim())),
+    ),
   ),
 });
+
+/**
+ * The API Worker's own public origin, which yielded checks requests against
+ * (ADR 0030). HTTPS only: the session cookie is `Secure`.
+ */
+export const ApiPublicOriginConfig = Config.NonEmptyString("API_PUBLIC_ORIGIN").pipe(
+  Config.mapEffect(decodeConfig(HttpsOrigin)),
+);
 
 /**
  * The hostnames the two Workers answer on, when the stage has any (ADR 0024).

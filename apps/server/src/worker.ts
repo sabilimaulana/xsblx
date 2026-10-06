@@ -3,11 +3,11 @@ import * as Cloudflare from "alchemy/Cloudflare";
 // Subpath import: the `alchemy/Drizzle` barrel eagerly loads its MySQL and
 // Postgres drivers, which this project does not install.
 import { D1 as drizzleD1 } from "alchemy/Drizzle/D1";
-import { Effect, Config, Layer, Logger, Path } from "effect";
+import { Effect, Layer, Logger, Path } from "effect";
 import { Etag, HttpPlatform, HttpRouter } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Assets } from "./assets.ts";
-import { apiObservability, ApiDomainConfig, CorsConfig } from "./config.ts";
+import { apiObservability, ApiDomainConfig, ApiPublicOriginConfig, CorsConfig } from "./config.ts";
 import { Database } from "./db/database.ts";
 import { Db } from "./db/index.ts";
 import { relations } from "./db/relations.ts";
@@ -97,7 +97,7 @@ export default class ApiWorker extends Cloudflare.Worker<ApiWorker>()(
     // Auth setup deferred those reads per request behind `Effect.cached`;
     // yielded needs the origin string at build, so the stage declares it.
     // Reading it here also binds it as Worker env.
-    const origin = yield* Config.String("API_PUBLIC_ORIGIN");
+    const origin = yield* ApiPublicOriginConfig;
 
     // Yielded owns the whole auth surface. `routes()` is its operation API
     // (register/sign-in/session) with its request handling baked in — the

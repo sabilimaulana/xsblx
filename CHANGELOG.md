@@ -18,6 +18,12 @@ in an ADR, not here — link it.
 
 ### Fixed
 
+- **A malformed origin fails the deploy, not every request.**
+  `CORS_ALLOWED_ORIGINS` entries and `API_PUBLIC_ORIGIN` must be exact origins
+  (no path, no trailing slash, no wildcard), and `API_PUBLIC_ORIGIN` must be
+  HTTPS. A bad value is a `ConfigError` at deploy; before, a trailing slash
+  crashed the Worker at startup.
+
 - **Concurrent password sign-ins queue instead of failing.** Argon2 admission
   queues up to 8 derivations for up to 20s per isolate; before, the third
   concurrent sign-in failed after 5s.
