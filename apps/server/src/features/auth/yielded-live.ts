@@ -1,5 +1,6 @@
 import { Password, Sessions } from "@yielded/auth";
 import { EmailDelivery } from "@yielded/auth";
+import { layerWebCrypto } from "@yielded/crypto/WebCrypto";
 import { Effect, Layer, Option, Schema } from "effect";
 
 import { AppAuth } from "./yielded-auth.ts";
@@ -134,6 +135,9 @@ const CoreLive = AppAuth.layer.pipe(
   Layer.provideMerge(ScreeningLive),
   Layer.provideMerge(FailClosedDelivery),
   Layer.provideMerge(PasswordMutationsDeny),
+  // Entropy, SHA digests and HMAC from the isolate's WebCrypto, for every
+  // module (sessions, proofs, password hashing).
+  Layer.provideMerge(layerWebCrypto),
   Layer.orDie,
 );
 

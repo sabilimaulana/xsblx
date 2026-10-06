@@ -1,10 +1,11 @@
 import { Password } from "@yielded/auth";
-import * as PasswordCrypto from "@yielded/auth-crypto/Password";
+import * as Portable from "@yielded/crypto/Portable";
 import { Effect, Layer } from "effect";
 
 /**
- * Spike: password hashing (Argon2id via WebCrypto, Workers-safe — no native
- * bindings) plus the new-password policy. Minimum length stays 8 to match the
+ * Spike: password hashing (Argon2id from `@yielded/crypto/Portable` — Workers
+ * have no native Argon2id, so the owned JS implementation runs on the request
+ * thread) plus the new-password policy. Minimum length stays 8 to match the
  * `MIN_PASSWORD_LENGTH` the web forms already enforce.
  *
  * Compromised-password screening is allow-all in the spike; production wires a
@@ -20,7 +21,13 @@ export const ScreeningLive = Layer.succeed(
   }),
 );
 
-export const HashingLive = PasswordCrypto.layer().pipe(
+/**
+ * One `PasswordKdfAdmission` instance feeds both the hasher and the KDF
+ * backend, so a single permit bounds every derivation in the isolate. Effect
+ * `Crypto` comes from the auth assembly (`yielded-live.ts`).
+ */
+export const HashingLive = Password.PasswordHashing.layer().pipe(
+  Layer.provide(Portable.layer(globalThis.crypto.subtle)),
   Layer.provide(Password.PasswordKdfAdmission.layer()),
 );
 

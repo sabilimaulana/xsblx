@@ -2,7 +2,7 @@ import { Password, Sessions } from "@yielded/auth";
 import { Schema as AuthSchema } from "@yielded/auth";
 import { coordinateCommit, LifecycleHooks } from "@yielded/auth/Hooks";
 import { hooksLayer } from "@yielded/auth/Persistence";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, lt } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
@@ -18,8 +18,8 @@ import { nowMillis } from "./yielded-support.ts";
 import {
   credentials,
   identifiers,
+  passwordAttemptCharges,
   passwordAttempts,
-  passwordCharges,
   passwordCommands,
   passwordRegistrations,
   passwords,
@@ -73,55 +73,48 @@ const credentialIdFor = (subjectId: string): string => `pwd-${subjectId}`;
 const live = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, Password.PasswordUnavailable> =>
   Effect.mapError(effect, () => Password.PasswordUnavailable.make({}));
 
-interface ScopeBudget {
-  readonly kind: string;
-  readonly key: string;
-  readonly limit: number;
-  readonly windowMillis: number;
-}
-
-/** Charge every open bucket (even when another bucket denies), like upstream. */
-const charge = Effect.fn("YieldedD1.charge")(function* (
-  db: Db["Service"],
-  action: string,
-  attemptId: string,
-  scopes: ReadonlyArray<ScopeBudget>,
-  now: number,
-) {
-  const open: Array<ScopeBudget> = [];
-  for (const scope of scopes) {
-    const recent = (yield* live(
-      db
-        .select({ occurredAt: col(passwordCharges, "occurred_at") })
-        .from(passwordCharges)
-        .where(
-          and(
-            eq(col(passwordCharges, "module_id"), moduleId),
-            eq(col(passwordCharges, "action"), action),
-            eq(col(passwordCharges, "scope_kind"), scope.kind),
-            eq(col(passwordCharges, "scope_key"), scope.key),
-          ),
-        ),
-    )) as Array<{ readonly occurredAt: number }>;
-    if (recent.filter((row) => row.occurredAt >= now - scope.windowMillis).length < scope.limit) {
-      open.push(scope);
-    }
-  }
-  for (const scope of open) {
-    yield* live(
-      db.insert(passwordCharges).values({
-        moduleId,
-        action,
-        scopeKind: scope.kind,
-        scopeKey: scope.key,
-        attemptId,
-        occurredAt: now,
-        retentionUntil: now + scope.windowMillis,
+/**
+ * Rolling-window attempt budget per (module, action, scope, key), shared by
+ * every isolate through D1. Expired rows for the key are pruned on each check.
+ * ponytail: count-then-insert is not atomic, so N concurrent attempts can
+ * overshoot a budget by up to N-1; move to a Durable Object counter if that
+ * matters.
+ */
+const AttemptLimiterLive = Layer.effect(
+  Password.PasswordAttemptLimiter,
+  Effect.gen(function* () {
+    const db = yield* Db;
+    const c = passwordAttemptCharges;
+    return Password.PasswordAttemptLimiter.of({
+      check: Effect.fn("YieldedD1.attemptLimit")(function* (input) {
+        const now = nowMillis();
+        const bucket = and(
+          eq(c.moduleId, input.moduleId),
+          eq(c.action, input.action),
+          eq(c.scope, input.scope),
+          eq(c.key, input.key),
+        );
+        yield* live(
+          db.delete(c).where(and(bucket, lt(c.occurredAt, now - input.budget.windowMillis))),
+        );
+        const [used] = yield* live(db.select({ n: count() }).from(c).where(bucket));
+        if ((used?.n ?? 0) >= input.budget.limit) {
+          return yield* Password.PasswordRejected.make({});
+        }
+        yield* live(
+          db.insert(c).values({
+            id: newId(),
+            moduleId: input.moduleId,
+            action: input.action,
+            scope: input.scope,
+            key: input.key,
+            occurredAt: now,
+          }),
+        );
       }),
-    );
-  }
-  return open.length === scopes.length;
-});
+    });
+  }),
+);
 
 /** Resolve a login email to its active subject, or undefined. */
 const subjectForEmail = Effect.fn("YieldedD1.subjectForEmail")(function* (
@@ -337,92 +330,64 @@ export const PasswordPortsLive = Layer.effectContext(
       );
 
     const persistence = Password.PasswordPersistence.of({
-      admitAttempt: (input, prepare) =>
-        withCommit((journal) =>
-          Effect.gen(function* () {
-            const now = nowMillis();
-            if (input.moduleId !== moduleId) {
-              return prepare({ _tag: "Denied" }, journal);
-            }
-            const subject =
-              input.identifier.namespace === "email"
-                ? yield* subjectForEmail(db, input.identifier.value)
-                : undefined;
-            const accounts = subject === undefined ? [] : [subject];
-            const account = accounts.find(
-              (row) =>
-                row.status === "active" &&
-                input.identifier.namespace === "email" &&
-                (input.subjectId === undefined || row.id === input.subjectId),
-            );
-            const captured =
-              account === undefined ? undefined : yield* readSnapshot(db, account.id);
-            const credential =
-              captured !== undefined && Option.isSome(captured)
-                ? { credential: captured.value }
-                : {};
-            const scopes: Array<ScopeBudget> = [
-              { kind: "global", key: "global", ...input.policy.action },
-              {
-                kind: "identifier",
-                key: `${input.identifier.namespace}/${input.identifier.value}`,
-                ...input.policy.identifier,
-              },
-              ...(account === undefined
-                ? []
-                : [{ kind: "subject", key: account.id, ...input.policy.subject }]),
-            ];
-            const attemptId = Password.PasswordAttemptId.make(newId());
-            const admitted = yield* charge(db, input.action, attemptId, scopes, now);
-            const pending = (yield* live(
-              db
-                .select({
-                  attemptId: col(passwordAttempts, "attempt_id"),
-                  deadline: col(passwordAttempts, "deadline"),
-                })
-                .from(passwordAttempts)
-                .where(
-                  and(
-                    eq(col(passwordAttempts, "module_id"), moduleId),
-                    eq(col(passwordAttempts, "state"), "pending"),
-                  ),
-                ),
-            )) as Array<{ readonly attemptId: string; readonly deadline: number }>;
-            if (
-              !admitted ||
-              pending.filter((row) => row.deadline > now).length >= input.policy.maximumPending
-            ) {
-              return prepare({ _tag: "Denied" }, journal);
-            }
-            const snapshot =
-              captured !== undefined && Option.isSome(captured) ? captured.value : undefined;
-            yield* live(
-              db.insert(passwordAttempts).values({
-                moduleId,
-                action: input.action,
-                attemptId,
-                identifierNamespace: input.identifier.namespace,
-                identifierValue: input.identifier.value,
-                subjectId: snapshot?.revision.subjectId,
-                credentialId: snapshot?.credentialId,
-                securityRevision: snapshot?.revision.securityRevision,
-                credentialRevision: snapshot?.credentialRevision,
-                verifierVersion: snapshot?.verifierVersion,
-                identifierBindingRevision: snapshot?.identifierBindingRevision,
-                admittedAt: now,
-                deadline: now + input.policy.attemptLifetimeMillis,
-                retentionUntil:
-                  now +
-                  Math.max(
-                    input.policy.attemptLifetimeMillis,
-                    ...scopes.map((scope) => scope.windowMillis),
-                  ),
-                state: "pending",
-              }),
-            );
-            return prepare({ _tag: "Admitted", attemptId, ...credential }, journal);
-          }),
-        ),
+      // Read the candidate without writing; limits are the strategy's, via
+      // `PasswordAttemptLimiter`, before this lookup and before `admit`.
+      prepareAttempt: (input) =>
+        Effect.gen(function* () {
+          const subject =
+            input.moduleId === moduleId && input.identifier.namespace === "email"
+              ? yield* subjectForEmail(db, input.identifier.value)
+              : undefined;
+          const account =
+            subject !== undefined &&
+            subject.status === "active" &&
+            (input.subjectId === undefined || subject.id === input.subjectId)
+              ? subject
+              : undefined;
+          const captured =
+            account === undefined ? Option.none() : yield* readSnapshot(db, account.id);
+          const snapshot = Option.getOrUndefined(captured);
+          return {
+            ...(snapshot === undefined ? {} : { credential: snapshot }),
+            admit: (prepare) =>
+              withCommit((journal) =>
+                Effect.gen(function* () {
+                  if (input.moduleId !== moduleId) {
+                    return prepare({ _tag: "Denied" }, journal);
+                  }
+                  const now = nowMillis();
+                  const attemptId = Password.PasswordAttemptId.make(newId());
+                  yield* live(
+                    db.insert(passwordAttempts).values({
+                      moduleId,
+                      action: input.action,
+                      attemptId,
+                      identifierNamespace: input.identifier.namespace,
+                      identifierValue: input.identifier.value,
+                      subjectId: snapshot?.revision.subjectId,
+                      credentialId: snapshot?.credentialId,
+                      securityRevision: snapshot?.revision.securityRevision,
+                      credentialRevision: snapshot?.credentialRevision,
+                      verifierVersion: snapshot?.verifierVersion,
+                      identifierBindingRevision: snapshot?.identifierBindingRevision,
+                      admittedAt: now,
+                      deadline: now + input.attemptLifetimeMillis,
+                      retentionUntil: now + input.attemptLifetimeMillis,
+                      state: "pending",
+                    }),
+                  );
+                  return prepare(
+                    {
+                      _tag: "Admitted",
+                      attemptId,
+                      ...(snapshot === undefined ? {} : { credential: snapshot }),
+                    },
+                    journal,
+                  );
+                }),
+              ),
+          } satisfies Password.PasswordAttemptPreparation;
+        }),
       settleAttempt: (input, prepare) =>
         withCommit((journal) =>
           Effect.gen(function* () {
@@ -774,4 +739,4 @@ export const PasswordPortsLive = Layer.effectContext(
       }),
     );
   }),
-).pipe(Layer.provideMerge(hooksLayer));
+).pipe(Layer.provideMerge(Layer.merge(hooksLayer, AttemptLimiterLive)));

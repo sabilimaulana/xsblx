@@ -1,6 +1,7 @@
 import {
   createPersistence,
   makeComposedPasskeys,
+  makeNativeSqlTables,
   PersistenceConfigurationError,
 } from "@yielded/auth-persistence/Adapter";
 import type { QueryOperations, StorageTable } from "@yielded/auth-persistence/Adapter";
@@ -134,6 +135,10 @@ const Persistence = createPersistence<SQLiteTable, Db>({
   makeTable,
   describe,
   operations,
+  // Only the interactive-transaction kernels read native tables, and no
+  // assembly here builds them (see `yielded-live.ts`); the default mapping
+  // satisfies the backend contract.
+  nativeTables: (client) => makeNativeSqlTables(client),
   acquire: Effect.map(Effect.context<Db>(), (ctx) => Context.get(ctx, Db)),
   passkeys: makeComposedPasskeys(operations),
 });

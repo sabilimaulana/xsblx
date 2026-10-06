@@ -9,7 +9,7 @@
   "dependencies": {
     "@effect/sql-d1": "catalog:effect",
     "@xsblx/api": "workspace:*",
-    "@yielded/auth-persistence": "^0.1.0-beta.14",
+    "@yielded/auth-persistence": "0.1.0-beta.23",
     "alchemy": "catalog:alchemy",
     "blobatar": "2.2.0",
     "drizzle-orm": "catalog:",
@@ -20,9 +20,8 @@
     "@cloudflare/workers-types": "catalog:",
     "@effect/vitest": "catalog:effect",
     "@types/bun": "latest",
-    "@yielded/auth": "^0.1.0-beta.14",
-    "@yielded/auth-crypto": "^0.1.0-beta.14",
-    "@yielded/auth-persistence-drizzle": "^0.1.0-beta.14",
+    "@yielded/auth": "0.1.0-beta.23",
+    "@yielded/crypto": "0.1.0-beta.23",
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   }

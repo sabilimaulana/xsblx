@@ -24,7 +24,7 @@
       "dependencies": {
         "@effect/sql-d1": "catalog:effect",
         "@xsblx/api": "workspace:*",
-        "@yielded/auth-persistence": "^0.1.0-beta.14",
+        "@yielded/auth-persistence": "0.1.0-beta.23",
         "alchemy": "catalog:alchemy",
         "blobatar": "2.2.0",
         "drizzle-orm": "catalog:",
@@ -35,9 +35,8 @@
         "@cloudflare/workers-types": "catalog:",
         "@effect/vitest": "catalog:effect",
         "@types/bun": "latest",
-        "@yielded/auth": "^0.1.0-beta.14",
-        "@yielded/auth-crypto": "^0.1.0-beta.14",
-        "@yielded/auth-persistence-drizzle": "^0.1.0-beta.14",
+        "@yielded/auth": "0.1.0-beta.23",
+        "@yielded/crypto": "0.1.0-beta.23",
         "typescript": "catalog:",
         "vitest": "^5.0.1",
       },
@@ -77,7 +76,7 @@
       "name": "@xsblx/api",
       "version": "0.0.0",
       "dependencies": {
-        "@yielded/auth": "^0.1.0-beta.14",
+        "@yielded/auth": "0.1.0-beta.23",
         "effect": "catalog:effect",
       },
       "devDependencies": {
@@ -498,7 +497,7 @@
 
     "@neon/functions": ["@neon/functions@0.11.0", "", { "peerDependencies": { "hono": "^4.7.8" }, "optionalPeers": ["hono"] }, "sha512-xyIEk9aULR2nBTzyTgxljkM8aS+Ppe9oVw/t5mdqYOlY/mLFppHSZHq8hiWVDWy6Ca8oLd3loTtfVz+cZQQjsA=="],
 
-    "@noble/ciphers": ["@noble/ciphers@2.1.1", "", {}, "sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw=="],
+    "@noble/ciphers": ["@noble/ciphers@2.3.0", "", {}, "sha512-Clu/xdfgVTf9o7ngLOURaxePwR0j8sjclKEtVij10/jGulwFsPWCvvRgG/XjUVf8Nei+jLG6uwyXzUTGY1DQrw=="],
 
     "@noble/hashes": ["@noble/hashes@2.3.0", "", {}, "sha512-oN+QwyX7VSHotibwubG3kpzbwKrfnyR6OOO+3Nk/53ADL7FmgHHz4TgrbaYKvvOw09u6QTx0oiH1cNCIOuN0CQ=="],
 
@@ -910,13 +909,15 @@
 
     "@xsblx/ui": ["@xsblx/ui@workspace:packages/ui"],
 
-    "@yielded/auth": ["@yielded/auth@0.1.0-beta.14", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-E1gBXbEFFVwWLE98wO+lo3U3ZIGp4MVQ4vaCLOgw9qhvYm06jrLKMks2K50PU5+YCHTPrvFmM8NhBK/UVxqN7A=="],
+    "@yielded/auth": ["@yielded/auth@0.1.0-beta.23", "", { "dependencies": { "@yielded/crypto": "0.1.0-beta.23", "@yielded/jose": "0.1.0-beta.23", "@yielded/oauth": "0.1.0-beta.23" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-DGjlyD95HHhAjJwgZHyL4i2s688l10Sdj8DrfLRjexRF6TBepbARX4r31LdDfKUKwS0z9MHk5gH2rWLjwWEuVw=="],
 
-    "@yielded/auth-crypto": ["@yielded/auth-crypto@0.1.0-beta.14", "", { "dependencies": { "@noble/ciphers": "2.1.1", "@noble/hashes": "2.3.0", "@yielded/auth": "0.1.0-beta.14" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-3b0+BbPG53C196PLacDVQFqVywy7VcQu2owu1yc438/ZpX37DPw1rHfLzTg7XtLt5TdjHarZ99J/mMyD4UVoKg=="],
+    "@yielded/auth-persistence": ["@yielded/auth-persistence@0.1.0-beta.23", "", { "dependencies": { "@yielded/auth": "0.1.0-beta.23" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-UCvkO4qdRUJKI4AkWPo3PPx7KgBfuEsFrj/oPD3QrvJbKoVAJ3JV6Ecqgy6FdOiYaRx+yyg5+Snrw5whTIKu+w=="],
 
-    "@yielded/auth-persistence": ["@yielded/auth-persistence@0.1.0-beta.14", "", { "dependencies": { "@noble/hashes": "2.3.0", "@yielded/auth": "0.1.0-beta.14", "@yielded/auth-crypto": "0.1.0-beta.14" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-lPd3RSEXSbADkbUGI7tjymp7SlZKRZXkvsuQVZfBOPsGn7rBmBMEKe5tc7I1zpe8F/nAYO9ixpqWe81qdhNz/g=="],
+    "@yielded/crypto": ["@yielded/crypto@0.1.0-beta.23", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-0byuVDWvFFXR7drv9VVO+WxXmZDIbP02HvzlbkKy0kPqv7334R6a+RQkxtfeQM9kJVwCMBfm36Zq/MpdkZkGDQ=="],
 
-    "@yielded/auth-persistence-drizzle": ["@yielded/auth-persistence-drizzle@0.1.0-beta.14", "", { "dependencies": { "@noble/hashes": "2.3.0", "@yielded/auth": "0.1.0-beta.14", "@yielded/auth-crypto": "0.1.0-beta.14", "@yielded/auth-persistence": "0.1.0-beta.14" }, "peerDependencies": { "@effect/sql-d1": ">=4.0.0", "@effect/sql-libsql": ">=4.0.0", "@effect/sql-mysql2": ">=4.0.0", "@effect/sql-pg": ">=4.0.0", "@effect/sql-pglite": ">=4.0.0", "@effect/sql-sqlite-bun": ">=4.0.0", "@effect/sql-sqlite-do": ">=4.0.0", "@effect/sql-sqlite-node": ">=4.0.0", "@effect/sql-sqlite-wasm": ">=4.0.0", "drizzle-orm": ">=1.0.0-rc.4", "effect": "^4.0.0" }, "optionalPeers": ["@effect/sql-d1", "@effect/sql-libsql", "@effect/sql-mysql2", "@effect/sql-pg", "@effect/sql-pglite", "@effect/sql-sqlite-bun", "@effect/sql-sqlite-do", "@effect/sql-sqlite-node", "@effect/sql-sqlite-wasm"] }, "sha512-bYQJU2WXsMnq/x4ZCo6zqBuJ8CkDPqaeiV38ZvWdUcm9Mzr6Ru3Wiah2E31RHbMqoOGTZFaSd+yIrnBjrZGvNw=="],
+    "@yielded/jose": ["@yielded/jose@0.1.0-beta.23", "", { "dependencies": { "@yielded/crypto": "0.1.0-beta.23" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-7DW3u23N2/OWLjpHyTTANbQ6P9xGR/mCHaN2NYjs90e2/NCkHgI5+szQ3Ym364K40MSTLMXoBAdj2RuwaM2RPA=="],
+
+    "@yielded/oauth": ["@yielded/oauth@0.1.0-beta.23", "", { "dependencies": { "@yielded/jose": "0.1.0-beta.23" }, "peerDependencies": { "effect": "^4.0.0" } }, "sha512-mQKcmyDmlFyD6PbxcZRLbXJb0yUPAyBDzDuVwEbGVVnfuZzluNQlRWYBI8JE1k2jfgcBdhnZ1x2apey5UBt5gg=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
@@ -1777,8 +1778,6 @@
     "@tanstack/start-plugin-core/source-map": ["source-map@0.7.6", "", {}, "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="],
 
     "@tanstack/start-plugin-core/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
-
-    "better-auth/@noble/ciphers": ["@noble/ciphers@2.3.0", "", {}, "sha512-Clu/xdfgVTf9o7ngLOURaxePwR0j8sjclKEtVij10/jGulwFsPWCvvRgG/XjUVf8Nei+jLG6uwyXzUTGY1DQrw=="],
 
     "better-auth/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 

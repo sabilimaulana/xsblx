@@ -11,6 +11,15 @@ in an ADR, not here — link it.
 
 ### Changed
 
+- **yielded-auth spike moves to `0.1.0-beta.23`, the zero-dependency core.**
+  `@yielded/auth-crypto` is replaced by `@yielded/crypto`: password Argon2id
+  runs on its `Portable` backend, and Effect `Crypto`/`Hmac` come from its
+  WebCrypto layer. Attempt limiting left persistence for the
+  `PasswordAttemptLimiter` service, so the managed `password_scopes` and
+  `password_charges` tables are gone and a D1-backed limiter over a new
+  `xsblx_auth_password_attempt_charges` table replaces the per-isolate default.
+  The unused `@yielded/auth-persistence-drizzle` dependency is dropped and the
+  yielded versions are pinned exactly.
 - **The version set goes stable: Effect `4.0.0` and alchemy `2.0.0-beta.80`.**
   Beta.80 imports stable `effect/cli/*`, which no release candidate exports,
   so the set moves off rc.115 together (ADR 0029). The `unstable/*` import
